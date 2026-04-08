@@ -1,7 +1,5 @@
-# Audio Test Asset Location
+# Audio Assets
 
-Place your smoke-test audio file at:
+Place bundled playback assets for DreamNest in this folder.
 
-- `DreamNest/Resources/Audio/test_white_noise.mp3`
-
-This file is loaded by the temporary Home screen **Play Test Sound** button.
+Add each file to the `DreamNest` target membership so it is copied into the app bundle.
