@@ -53,7 +53,7 @@ final class HomeViewModel: ObservableObject {
     func quickStart() {
         Task {
             do {
-                try audio.configureSession()
+                try audio.configureSession(micModeEnabled: cryModeEnabled)
                 try await audio.play(sound: selectedSound, volume: safetyPolicy.clamped(volume: volume))
                 timer.start(duration: settings.timer.duration, fadeDuration: settings.timer.fadeDuration)
                 isPlaying = true

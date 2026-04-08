@@ -216,7 +216,7 @@ struct HomeView: View {
 
 private final class PreviewAudioService: AudioPlaybackControlling {
     var playbackStatePublisher: AnyPublisher<AudioPlaybackState, Never> { Just(.idle).eraseToAnyPublisher() }
-    func configureSession() throws {}
+    func configureSession(micModeEnabled: Bool) throws {}
     func play(sound: SoundDefinition, volume: Float) async throws {}
     func pause() {}
     func resume() {}
