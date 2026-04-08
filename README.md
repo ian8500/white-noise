@@ -51,3 +51,7 @@ Production-grade SwiftUI architecture scaffold for sleep-audio playback + local 
 See:
 - `DreamNest/Resources/CONFIGURATION.md`
 - `DreamNest/Resources/IMPLEMENTATION_NOTES.md`
+
+## Strategic execution plan
+
+- See `DREAMNEST_EXECUTION_PLAN.md` for a full 12-week production build-and-launch plan covering product, architecture, backlog, QA, analytics, and GTM.
