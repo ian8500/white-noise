@@ -4,7 +4,7 @@ import Foundation
 
 public protocol AudioPlaybackControlling: AnyObject {
     var playbackStatePublisher: AnyPublisher<AudioPlaybackState, Never> { get }
-    func configureSession() throws
+    func configureSession(micModeEnabled: Bool) throws
     func play(sound: SoundDefinition, volume: Float) async throws
     func pause()
     func resume()

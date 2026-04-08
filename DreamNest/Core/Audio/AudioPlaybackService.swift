@@ -4,6 +4,7 @@ import Foundation
 import MediaPlayer
 
 public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
+    private static let supportedAudioExtensions: Set<String> = ["mp3", "wav", "m4a", "aac", "aif", "aiff", "caf"]
     private let state = CurrentValueSubject<AudioPlaybackState, Never>(.idle)
     private var player: AVAudioPlayer?
     private var fadeTask: Task<Void, Never>?
@@ -21,14 +22,20 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         NotificationCenter.default.removeObserver(self)
     }
 
-    public func configureSession() throws {
+    public func configureSession(micModeEnabled: Bool) throws {
         let session = AVAudioSession.sharedInstance()
+        let category: AVAudioSession.Category = micModeEnabled ? .playAndRecord : .playback
+        let options: AVAudioSession.CategoryOptions = micModeEnabled ? [.defaultToSpeaker, .allowBluetooth] : []
+        let mode: AVAudioSession.Mode = .default
+
+        print("[Audio] ℹ️ Preparing AVAudioSession configuration. micModeEnabled=\(micModeEnabled)")
+        print("[Audio] ℹ️ Session pre-state. category=\(session.category.rawValue), mode=\(session.mode.rawValue), options=\(describe(options: session.categoryOptions)), route=\(describe(route: session.currentRoute))")
         do {
-            try session.setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetoothA2DP])
+            try session.setCategory(category, mode: mode, options: options)
             try session.setActive(true)
-            print("[Audio] ✅ Session configured. category=\(session.category.rawValue), mode=\(session.mode.rawValue), route=\(session.currentRoute)")
+            print("[Audio] ✅ Session configured. category=\(session.category.rawValue), mode=\(session.mode.rawValue), options=\(describe(options: session.categoryOptions)), route=\(describe(route: session.currentRoute)), micModeEnabled=\(micModeEnabled)")
         } catch {
-            print("[Audio] ❌ Session configuration failed: \(error.localizedDescription)")
+            print("[Audio] ❌ Session configuration failed. category=\(category.rawValue), mode=\(mode.rawValue), options=\(describe(options: options)), micModeEnabled=\(micModeEnabled), error=\(error.localizedDescription)")
             throw error
         }
     }
@@ -45,6 +52,13 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         }
 
         print("[Audio] ✅ Resolved file URL: \(url.path)")
+        let ext = url.pathExtension.lowercased()
+        guard Self.supportedAudioExtensions.contains(ext) else {
+            let message = "Unsupported audio format '\(ext)' for '\(url.lastPathComponent)'. Supported formats: \(Self.supportedAudioExtensions.sorted().joined(separator: ", "))."
+            print("[Audio] ❌ \(message)")
+            state.send(.failed(message: message))
+            throw NSError(domain: "DreamNest.Audio", code: 415, userInfo: [NSLocalizedDescriptionKey: message])
+        }
 
         let newPlayer: AVAudioPlayer
         do {
@@ -238,5 +252,25 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
             self?.pause()
             return .success
         }
+    }
+
+    private func describe(options: AVAudioSession.CategoryOptions) -> String {
+        let entries: [(AVAudioSession.CategoryOptions, String)] = [
+            (.mixWithOthers, "mixWithOthers"),
+            (.duckOthers, "duckOthers"),
+            (.interruptSpokenAudioAndMixWithOthers, "interruptSpokenAudioAndMixWithOthers"),
+            (.allowBluetooth, "allowBluetooth"),
+            (.allowBluetoothA2DP, "allowBluetoothA2DP"),
+            (.allowAirPlay, "allowAirPlay"),
+            (.defaultToSpeaker, "defaultToSpeaker")
+        ]
+        let enabled = entries.compactMap { options.contains($0.0) ? $0.1 : nil }
+        return enabled.isEmpty ? "[]" : "[\(enabled.joined(separator: ", "))]"
+    }
+
+    private func describe(route: AVAudioSessionRouteDescription) -> String {
+        let outputs = route.outputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ", ")
+        let inputs = route.inputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ", ")
+        return "inputs=[\(inputs)] outputs=[\(outputs)]"
     }
 }
