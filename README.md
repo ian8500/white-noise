@@ -2,35 +2,13 @@
 
 DreamNest is a SwiftUI iOS app for baby white-noise playback with an intentionally simple, reliable AVAudioPlayer path.
 
-## Quick Audio Smoke Test (First Working Build)
+## Build and Run
 
-### 1) Place the required test file
-Add this file to the repo:
+1. Open `DreamNest.xcodeproj` in Xcode.
+2. Select the `DreamNest` scheme.
+3. Build and run (`⌘R`) on a simulator or real iPhone.
 
-- `DreamNest/Resources/Audio/test_white_noise.mp3`
-
-The app's temporary smoke-test buttons expect exactly that filename.
-
-### 2) Verify target membership in Xcode
-1. Open `DreamNest.xcodeproj`.
-2. In the Project navigator, click `DreamNest/Resources/Audio/test_white_noise.mp3`.
-3. Open the File Inspector (right panel).
-4. Under **Target Membership**, check **DreamNest**.
-5. In **Build Phases** for target **DreamNest**, verify the file appears in **Copy Bundle Resources**.
-
-### 3) Build/run order
-- **First preference:** test on a **real iPhone** (best for reliable audio route/silent switch behavior).
-- Simulator can work for basic verification, but real hardware is the source of truth.
-
-### 4) Run and hear audio
-1. Build and run (`⌘R`).
-2. On Home, tap **Play Test Sound**.
-3. Confirm Xcode console logs:
-   - audio session setup success/failure
-   - file URL resolution
-   - player initialization
-   - playback start/failure
-4. Tap **Stop Sound** to end playback.
+For the most accurate audio route and hardware behavior, validate playback on a real device.
 
 ## Implementation Notes
 
@@ -39,8 +17,7 @@ The app's temporary smoke-test buttons expect exactly that filename.
 - Uses `AVAudioPlayer` with:
   - `numberOfLoops = -1`
   - `prepareToPlay()`
-  - default playback volume of `0.5` for the smoke test.
-- Fails loudly in logs when the bundle asset is missing.
+- Fails loudly in logs when a required bundle asset is missing.
 
 ## Existing Repo Structure
 
@@ -53,7 +30,6 @@ DreamNest/
 ├── PreviewContent/
 └── Resources/
     ├── Audio/
-    │   ├── README.md
-    │   └── test_white_noise.mp3   <- add this file
+    │   └── README.md
     └── Info.plist
 ```

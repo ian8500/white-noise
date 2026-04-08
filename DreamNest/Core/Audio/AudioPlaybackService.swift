@@ -38,7 +38,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         let url = resolveBundledSoundURL(filename: sound.filename)
 
         guard let url else {
-            let message = "Missing bundled audio asset for '\(sound.filename)'. Expected one of: test_white_noise.mp3 / .wav at Resources/Audio/."
+            let message = "Missing bundled audio asset for '\(sound.filename)'. Ensure the file exists in Resources/Audio and is included in target membership."
             print("[Audio] ❌ \(message)")
             state.send(.failed(message: message))
             throw NSError(domain: "DreamNest.Audio", code: 404, userInfo: [NSLocalizedDescriptionKey: message])
