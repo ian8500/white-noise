@@ -8,6 +8,7 @@ struct AppEnvironment {
         let catalog = SoundCatalogService()
         let store = UserDefaultsSettingsStore()
         let timer = SleepTimerEngine()
+        let settings = store.load()
 
         return AppEnvironment(
             homeViewModel: HomeViewModel(
@@ -16,9 +17,13 @@ struct AppEnvironment {
                 timer: timer,
                 store: store,
                 cryService: LocalCryDetectionService(
-                    stateMachine: CryDetectionStateMachine(config: .init(cooldown: store.load().cryResponse.cooldown))
+                    stateMachine: CryDetectionStateMachine(config: .init(cooldown: settings.cryResponse.cooldown))
                 ),
-                safetyPolicy: NoiseSafetyPolicy(maxGainCap: store.load().maxGainCap)
+                safetyPolicy: NoiseSafetyPolicy(
+                    maxGainCap: settings.noiseProtection.maxGainCap,
+                    warningThreshold: settings.noiseProtection.warningThreshold
+                ),
+                cryResponseCoordinator: CryResponseCoordinator()
             )
         )
     }

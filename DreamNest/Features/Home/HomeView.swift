@@ -12,6 +12,7 @@ struct HomeView: View {
                 VStack(spacing: 18) {
                     header
                     quickStartButton
+                    timerCard
                     volumeCard
                     soundPicker
                     cryModeCard
@@ -32,15 +33,17 @@ struct HomeView: View {
             Text("DreamNest")
                 .font(.largeTitle.weight(.bold))
                 .foregroundStyle(DreamNestTheme.primaryText)
-            Text("Sleep support sounds for bedtime routines.")
+            Text("Premium white noise for calm, safer bedtimes.")
                 .foregroundStyle(DreamNestTheme.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("DreamNest. Premium white noise for calmer bedtimes.")
     }
 
     private var quickStartButton: some View {
         Button(action: viewModel.quickStart) {
-            Text("Quick Start")
+            Label("Start Sleep Session", systemImage: "moon.zzz.fill")
                 .font(.title3.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -48,6 +51,42 @@ struct HomeView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityHint("Starts the selected sound with your configured timer.")
+    }
+
+    private var timerCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Sleep Timer")
+                .foregroundStyle(DreamNestTheme.primaryText)
+            HStack {
+                timerPresetButton("30m", minutes: 30)
+                timerPresetButton("45m", minutes: 45)
+                timerPresetButton("60m", minutes: 60)
+            }
+
+            HStack {
+                Text("Fade")
+                Spacer()
+                Button("15s") { viewModel.updateFadeDuration(seconds: 15) }
+                Button("30s") { viewModel.updateFadeDuration(seconds: 30) }
+                Button("60s") { viewModel.updateFadeDuration(seconds: 60) }
+            }
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(DreamNestTheme.secondaryText)
+        }
+        .padding()
+        .background(DreamNestTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func timerPresetButton(_ title: String, minutes: Int) -> some View {
+        Button(title) { viewModel.applyTimerPreset(minutes: minutes) }
+            .foregroundStyle(DreamNestTheme.primaryText)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(DreamNestTheme.cardBackground.opacity(0.9))
+            .clipShape(Capsule())
+            .accessibilityLabel("Set timer to \(minutes) minutes")
     }
 
     private var volumeCard: some View {
@@ -58,9 +97,13 @@ struct HomeView: View {
                 get: { Double(viewModel.volume) },
                 set: { viewModel.setVolume(Float($0)) }
             ), in: 0 ... 1)
+            .accessibilityLabel("Playback volume")
+            .accessibilityValue("\(Int(viewModel.volume * 100)) percent")
+
             Text("\(Int(viewModel.timerRemaining))s remaining")
                 .foregroundStyle(DreamNestTheme.secondaryText)
                 .font(.footnote)
+                .accessibilityLabel("\(Int(viewModel.timerRemaining)) seconds remaining")
         }
         .padding()
         .background(DreamNestTheme.cardBackground)
@@ -88,6 +131,7 @@ struct HomeView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
+                .accessibilityHint("Select \(sound.title) sound.")
             }
         }
         .padding()
@@ -110,6 +154,7 @@ struct HomeView: View {
                 set: { viewModel.toggleCryMode($0) }
             ))
             .labelsHidden()
+            .accessibilityLabel("Cry response mode")
         }
         .padding()
         .background(DreamNestTheme.cardBackground)
@@ -124,7 +169,8 @@ struct HomeView: View {
         timer: SleepTimerEngine(),
         store: UserDefaultsSettingsStore(defaults: .standard),
         cryService: PreviewCryService(),
-        safetyPolicy: .init()
+        safetyPolicy: .init(),
+        cryResponseCoordinator: CryResponseCoordinator()
     ))
 }
 

@@ -24,9 +24,12 @@
 		A6ED11473A15DF612ECE9FBB /* ExposureGuidanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3FE03617FC4FE5E7998AFC8 /* ExposureGuidanceView.swift */; };
 		5CD8CBDCD55B6E0B85593F38 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95E74AD2E6BF3DA3D719D24A /* HomeView.swift */; };
 		8CC0E327992969C54C35329E /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF6A0848ADF49AB24F115B59 /* HomeViewModel.swift */; };
+		AA41B00B5CFA4EAFA803BE9C /* CryResponseCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4DF1C3FD4FC1CE1847E7A1 /* CryResponseCoordinator.swift */; };
+		928B4A3B45FA23D167D39B5B /* PreviewData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 736355BBAA314A1D2DEEF6E0 /* PreviewData.swift */; };
 		8EAD96454E4F97F5A4C973C2 /* CryDetectionStateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF66D4F42F368D6AAEC1228 /* CryDetectionStateMachineTests.swift */; };
 		F6459F06DC935A76BBF6B6DD /* FadeCurveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BEB5DE38945AA500483597 /* FadeCurveTests.swift */; };
 		4FB9612F0EB6575FAC9BAA31 /* SleepTimerEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 995D253D27F3222419A3F8A5 /* SleepTimerEngineTests.swift */; };
+		97BF57C6EABBA53E3D0A0A61 /* CryResponseCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6865D739666214CA24A251C1 /* CryResponseCoordinatorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,9 +55,12 @@
 		C3FE03617FC4FE5E7998AFC8 /* ExposureGuidanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExposureGuidanceView.swift; sourceTree = "<group>"; };
 		95E74AD2E6BF3DA3D719D24A /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		BF6A0848ADF49AB24F115B59 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		7A4DF1C3FD4FC1CE1847E7A1 /* CryResponseCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryResponseCoordinator.swift; sourceTree = "<group>"; };
+		736355BBAA314A1D2DEEF6E0 /* PreviewData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewData.swift; sourceTree = "<group>"; };
 		CEF66D4F42F368D6AAEC1228 /* CryDetectionStateMachineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryDetectionStateMachineTests.swift; sourceTree = "<group>"; };
 		F5BEB5DE38945AA500483597 /* FadeCurveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FadeCurveTests.swift; sourceTree = "<group>"; };
 		995D253D27F3222419A3F8A5 /* SleepTimerEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTimerEngineTests.swift; sourceTree = "<group>"; };
+		6865D739666214CA24A251C1 /* CryResponseCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryResponseCoordinatorTests.swift; sourceTree = "<group>"; };
 		C598A62A335461D0C36DCEB4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		64E13B2DE281B334715E1F9A /* DreamNest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DreamNest.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		805E616C1FC158D46D33BFC8 /* DreamNestTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DreamNestTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -77,6 +83,7 @@
 			7E63FB79D8432E92B2BF05B7 /* Core */,
 			C6C7B26DFCD2E667DD1A7984 /* DesignSystem */,
 			4ABCA3AA88E186E548666A06 /* Features */,
+			1FDE7AAFC45748EC93BC4A28 /* PreviewContent */,
 			B642DCC00EC1A184662227C2 /* Resources */,
 		); path = DreamNest; sourceTree = "<group>"; };
 		77C037C483DC6B00C463C5F9 /* App */ = {isa = PBXGroup; children = (
@@ -89,6 +96,9 @@
 		B642DCC00EC1A184662227C2 /* Resources */ = {isa = PBXGroup; children = (
 			C598A62A335461D0C36DCEB4 /* Info.plist */,
 		); path = Resources; sourceTree = "<group>"; };
+		1FDE7AAFC45748EC93BC4A28 /* PreviewContent */ = {isa = PBXGroup; children = (
+			736355BBAA314A1D2DEEF6E0 /* PreviewData.swift */,
+		); path = PreviewContent; sourceTree = "<group>"; };
 		7E63FB79D8432E92B2BF05B7 /* Core */ = {isa = PBXGroup; children = (
 			7736F3FD1EE31C92ECDC8989 /* Audio */,
 			803BD4D48545FE7327AD5102 /* CryDetection */,
@@ -105,6 +115,7 @@
 		803BD4D48545FE7327AD5102 /* CryDetection */ = {isa = PBXGroup; children = (
 			58009C55F24F35FA72515352 /* CryDetectionStateMachine.swift */,
 			548C60900DB5068353DC09D3 /* LocalCryDetectionService.swift */,
+			7A4DF1C3FD4FC1CE1847E7A1 /* CryResponseCoordinator.swift */,
 		); path = CryDetection; sourceTree = "<group>"; };
 		E5A292CA13EB2FFE4DE37562 /* Models */ = {isa = PBXGroup; children = (
 			3085EA22953F12064B56C358 /* AppSettings.swift */,
@@ -142,6 +153,7 @@
 			CEF66D4F42F368D6AAEC1228 /* CryDetectionStateMachineTests.swift */,
 			F5BEB5DE38945AA500483597 /* FadeCurveTests.swift */,
 			995D253D27F3222419A3F8A5 /* SleepTimerEngineTests.swift */,
+			6865D739666214CA24A251C1 /* CryResponseCoordinatorTests.swift */,
 		); path = DreamNestTests; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
@@ -183,11 +195,14 @@
 			A6ED11473A15DF612ECE9FBB /* in Sources */,
 			5CD8CBDCD55B6E0B85593F38 /* in Sources */,
 			8CC0E327992969C54C35329E /* in Sources */,
+			AA41B00B5CFA4EAFA803BE9C /* in Sources */,
+			928B4A3B45FA23D167D39B5B /* in Sources */,
 		); runOnlyForDeploymentPostprocessing = 0; };
 		538D3E49D70BE382997AA76F /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
 			8EAD96454E4F97F5A4C973C2 /* in Sources */,
 			F6459F06DC935A76BBF6B6DD /* in Sources */,
 			4FB9612F0EB6575FAC9BAA31 /* in Sources */,
+			97BF57C6EABBA53E3D0A0A61 /* in Sources */,
 		); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
