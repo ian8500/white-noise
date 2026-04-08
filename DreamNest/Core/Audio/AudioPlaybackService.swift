@@ -1,7 +1,7 @@
 import AVFoundation
 import Combine
-import MediaPlayer
 import Foundation
+import MediaPlayer
 
 public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
     private let state = CurrentValueSubject<AudioPlaybackState, Never>(.idle)
@@ -23,30 +23,59 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
 
     public func configureSession() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playback, mode: .default, options: [.mixWithOthers, .allowAirPlay])
-        try session.setActive(true)
+        do {
+            try session.setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetoothA2DP])
+            try session.setActive(true)
+            print("[Audio] ✅ Session configured. category=\(session.category.rawValue), mode=\(session.mode.rawValue), route=\(session.currentRoute)")
+        } catch {
+            print("[Audio] ❌ Session configuration failed: \(error.localizedDescription)")
+            throw error
+        }
     }
 
     public func play(sound: SoundDefinition, volume: Float) async throws {
         state.send(.preparing)
-        guard let url = Bundle.main.url(forResource: sound.filename, withExtension: "m4a") else {
-            state.send(.failed(message: "Missing asset: \(sound.filename).m4a"))
-            return
+        let url = resolveBundledSoundURL(filename: sound.filename)
+
+        guard let url else {
+            let message = "Missing bundled audio asset for '\(sound.filename)'. Expected one of: test_white_noise.mp3 / .wav at Resources/Audio/."
+            print("[Audio] ❌ \(message)")
+            state.send(.failed(message: message))
+            throw NSError(domain: "DreamNest.Audio", code: 404, userInfo: [NSLocalizedDescriptionKey: message])
         }
 
-        let newPlayer = try AVAudioPlayer(contentsOf: url)
+        print("[Audio] ✅ Resolved file URL: \(url.path)")
+
+        let newPlayer: AVAudioPlayer
+        do {
+            newPlayer = try AVAudioPlayer(contentsOf: url)
+        } catch {
+            print("[Audio] ❌ AVAudioPlayer initialization failed: \(error.localizedDescription)")
+            state.send(.failed(message: "Player initialization failed: \(error.localizedDescription)"))
+            throw error
+        }
+
+        print("[Audio] ✅ AVAudioPlayer initialized for '\(sound.title)'")
+
         newPlayer.numberOfLoops = -1
         newPlayer.volume = 0
         newPlayer.prepareToPlay()
-        newPlayer.play()
+
+        guard newPlayer.play() else {
+            let message = "AVAudioPlayer.play() returned false for file: \(url.lastPathComponent)"
+            print("[Audio] ❌ \(message)")
+            state.send(.failed(message: message))
+            throw NSError(domain: "DreamNest.Audio", code: 500, userInfo: [NSLocalizedDescriptionKey: message])
+        }
 
         let oldPlayer = player
         player = newPlayer
         nowPlayingSound = sound
         state.send(.playing(soundID: sound.id))
         updateNowPlaying(sound: sound, isPlaying: true)
+        print("[Audio] ✅ Playback started for '\(sound.title)' with looping enabled")
 
-        await crossfade(from: oldPlayer, to: newPlayer, targetVolume: volume)
+        await crossfade(from: oldPlayer, to: newPlayer, targetVolume: max(0, min(volume, 1)))
     }
 
     public func updateVolume(_ volume: Float, rampDuration: TimeInterval) {
@@ -67,15 +96,21 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         player?.pause()
         state.send(.idle)
         updateNowPlayingPlaybackState(isPlaying: false)
+        print("[Audio] ℹ️ Playback paused")
     }
 
     public func resume() {
         guard let player else { return }
-        player.play()
+        guard player.play() else {
+            print("[Audio] ❌ Resume failed: AVAudioPlayer.play() returned false")
+            return
+        }
+
         if let id = nowPlayingSound?.id {
             state.send(.playing(soundID: id))
         }
         updateNowPlayingPlaybackState(isPlaying: true)
+        print("[Audio] ✅ Playback resumed")
     }
 
     public func stop(fadeDuration: TimeInterval) async {
@@ -91,6 +126,31 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         self.player = nil
         state.send(.idle)
         updateNowPlayingPlaybackState(isPlaying: false)
+        print("[Audio] ✅ Playback stopped")
+    }
+
+    private func resolveBundledSoundURL(filename: String) -> URL? {
+        let fileBase = (filename as NSString).deletingPathExtension
+        let explicitExtension = (filename as NSString).pathExtension
+
+        let candidateExts: [String]
+        if explicitExtension.isEmpty {
+            candidateExts = ["mp3", "wav", "m4a"]
+        } else {
+            candidateExts = [explicitExtension]
+        }
+
+        let subdirectories = [nil, "Audio", "Resources/Audio"]
+        for ext in candidateExts {
+            for subdirectory in subdirectories {
+                if let url = Bundle.main.url(forResource: fileBase, withExtension: ext, subdirectory: subdirectory) {
+                    return url
+                }
+            }
+        }
+
+        print("[Audio] ❌ Could not resolve bundled file for '\(filename)'. Tried extensions=\(candidateExts), subdirectories=\(subdirectories.map { $0 ?? "<root>" })")
+        return nil
     }
 
     private func crossfade(from old: AVAudioPlayer?, to new: AVAudioPlayer, targetVolume: Float) async {

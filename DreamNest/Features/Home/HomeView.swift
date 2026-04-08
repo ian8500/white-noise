@@ -12,6 +12,7 @@ struct HomeView: View {
                 VStack(spacing: 18) {
                     header
                     quickStartButton
+                    testPlaybackCard
                     recentSoundsCard
                     timerCard
                     volumeCard
@@ -55,6 +56,40 @@ struct HomeView: View {
         .accessibilityHint("Starts the selected sound with your configured timer.")
     }
 
+
+    private var testPlaybackCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Audio Smoke Test")
+                .foregroundStyle(DreamNestTheme.primaryText)
+
+            HStack(spacing: 12) {
+                Button(action: viewModel.playTestSound) {
+                    Label("Play Test Sound", systemImage: "play.fill")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(DreamNestTheme.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                Button(action: viewModel.stopSound) {
+                    Label("Stop Sound", systemImage: "stop.fill")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(DreamNestTheme.cardBackground.opacity(0.9))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text("Expected bundle file: Resources/Audio/test_white_noise.mp3")
+                .font(.footnote)
+                .foregroundStyle(DreamNestTheme.secondaryText)
+        }
+        .padding()
+        .background(DreamNestTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
     private var timerCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Sleep Timer")

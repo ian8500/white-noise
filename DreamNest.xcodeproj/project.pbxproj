@@ -30,6 +30,7 @@
 		F6459F06DC935A76BBF6B6DD /* FadeCurveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BEB5DE38945AA500483597 /* FadeCurveTests.swift */; };
 		4FB9612F0EB6575FAC9BAA31 /* SleepTimerEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 995D253D27F3222419A3F8A5 /* SleepTimerEngineTests.swift */; };
 		97BF57C6EABBA53E3D0A0A61 /* CryResponseCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6865D739666214CA24A251C1 /* CryResponseCoordinatorTests.swift */; };
+		F0A10A0B0C0D0E0F10111213 /* Audio in Resources */ = {isa = PBXBuildFile; fileRef = F0A10A0B0C0D0E0F10111212 /* Audio */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +65,7 @@
 		C598A62A335461D0C36DCEB4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		64E13B2DE281B334715E1F9A /* DreamNest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DreamNest.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		805E616C1FC158D46D33BFC8 /* DreamNestTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DreamNestTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F0A10A0B0C0D0E0F10111212 /* Audio */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Audio; path = Audio; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,6 +97,7 @@
 		); path = DesignSystem; sourceTree = "<group>"; };
 		B642DCC00EC1A184662227C2 /* Resources */ = {isa = PBXGroup; children = (
 			C598A62A335461D0C36DCEB4 /* Info.plist */,
+			F0A10A0B0C0D0E0F10111212 /* Audio */,
 		); path = Resources; sourceTree = "<group>"; };
 		1FDE7AAFC45748EC93BC4A28 /* PreviewContent */ = {isa = PBXGroup; children = (
 			736355BBAA314A1D2DEEF6E0 /* PreviewData.swift */,
@@ -167,7 +170,9 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		068ABBD3FCE27411826A7997 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		068ABBD3FCE27411826A7997 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (
+			F0A10A0B0C0D0E0F10111213 /* Audio in Resources */,
+		); runOnlyForDeploymentPostprocessing = 0; };
 		DCB799FE92A6D2CDBAB03903 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 

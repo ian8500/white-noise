@@ -52,10 +52,48 @@ final class HomeViewModel: ObservableObject {
 
     func quickStart() {
         Task {
-            try? audio.configureSession()
-            try? await audio.play(sound: selectedSound, volume: safetyPolicy.clamped(volume: volume))
-            timer.start(duration: settings.timer.duration, fadeDuration: settings.timer.fadeDuration)
-            isPlaying = true
+            do {
+                try audio.configureSession()
+                try await audio.play(sound: selectedSound, volume: safetyPolicy.clamped(volume: volume))
+                timer.start(duration: settings.timer.duration, fadeDuration: settings.timer.fadeDuration)
+                isPlaying = true
+            } catch {
+                isPlaying = false
+                warningBanner = "Playback failed: \(error.localizedDescription)"
+                print("[Home] ❌ quickStart failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func playTestSound() {
+        Task {
+            do {
+                try audio.configureSession()
+                let testSound = SoundDefinition(
+                    id: "test-white-noise",
+                    title: "Test White Noise",
+                    category: .noise,
+                    filename: "test_white_noise",
+                    defaultEQProfile: .whiteNoise,
+                    isPremium: false,
+                    artworkKey: "test"
+                )
+                try await audio.play(sound: testSound, volume: safetyPolicy.clamped(volume: 0.5))
+                isPlaying = true
+                print("[Home] ✅ Test sound playback triggered")
+            } catch {
+                isPlaying = false
+                warningBanner = "Test playback failed: \(error.localizedDescription)"
+                print("[Home] ❌ Test playback failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func stopSound() {
+        Task {
+            await audio.stop(fadeDuration: 0.1)
+            isPlaying = false
+            print("[Home] ℹ️ Stop sound triggered")
         }
     }
 
