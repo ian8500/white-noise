@@ -14,6 +14,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
     public override init() {
         super.init()
         registerForInterruptionNotifications()
+        configureRemoteCommands()
     }
 
     deinit {
@@ -43,7 +44,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         player = newPlayer
         nowPlayingSound = sound
         state.send(.playing(soundID: sound.id))
-        updateNowPlaying(sound: sound)
+        updateNowPlaying(sound: sound, isPlaying: true)
 
         await crossfade(from: oldPlayer, to: newPlayer, targetVolume: volume)
     }
@@ -62,6 +63,21 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         }
     }
 
+    public func pause() {
+        player?.pause()
+        state.send(.idle)
+        updateNowPlayingPlaybackState(isPlaying: false)
+    }
+
+    public func resume() {
+        guard let player else { return }
+        player.play()
+        if let id = nowPlayingSound?.id {
+            state.send(.playing(soundID: id))
+        }
+        updateNowPlayingPlaybackState(isPlaying: true)
+    }
+
     public func stop(fadeDuration: TimeInterval) async {
         guard let player else { return }
         let initial = player.volume
@@ -74,6 +90,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         player.stop()
         self.player = nil
         state.send(.idle)
+        updateNowPlayingPlaybackState(isPlaying: false)
     }
 
     private func crossfade(from old: AVAudioPlayer?, to new: AVAudioPlayer, targetVolume: Float) async {
@@ -114,9 +131,11 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         case .began:
             player?.pause()
             state.send(.interrupted)
+            updateNowPlayingPlaybackState(isPlaying: false)
         case .ended:
             player?.play()
             if let id = nowPlayingSound?.id { state.send(.playing(soundID: id)) }
+            updateNowPlayingPlaybackState(isPlaying: true)
         @unknown default:
             break
         }
@@ -130,11 +149,34 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         if reason == .oldDeviceUnavailable { player?.pause() }
     }
 
-    private func updateNowPlaying(sound: SoundDefinition) {
+    private func updateNowPlaying(sound: SoundDefinition, isPlaying: Bool) {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
             MPMediaItemPropertyTitle: sound.title,
             MPNowPlayingInfoPropertyIsLiveStream: false,
-            MPNowPlayingInfoPropertyPlaybackRate: 1
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1 : 0
         ]
+    }
+
+    private func updateNowPlayingPlaybackState(isPlaying: Bool) {
+        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1 : 0
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    private func configureRemoteCommands() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.playCommand.isEnabled = true
+        commandCenter.pauseCommand.isEnabled = true
+        commandCenter.nextTrackCommand.isEnabled = false
+        commandCenter.previousTrackCommand.isEnabled = false
+
+        commandCenter.playCommand.addTarget { [weak self] _ in
+            self?.resume()
+            return .success
+        }
+        commandCenter.pauseCommand.addTarget { [weak self] _ in
+            self?.pause()
+            return .success
+        }
     }
 }

@@ -6,6 +6,8 @@ public protocol AudioPlaybackControlling: AnyObject {
     var playbackStatePublisher: AnyPublisher<AudioPlaybackState, Never> { get }
     func configureSession() throws
     func play(sound: SoundDefinition, volume: Float) async throws
+    func pause()
+    func resume()
     func updateVolume(_ volume: Float, rampDuration: TimeInterval)
     func stop(fadeDuration: TimeInterval) async
 }

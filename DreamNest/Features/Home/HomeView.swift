@@ -12,6 +12,7 @@ struct HomeView: View {
                 VStack(spacing: 18) {
                     header
                     quickStartButton
+                    recentSoundsCard
                     timerCard
                     volumeCard
                     soundPicker
@@ -121,6 +122,15 @@ struct HomeView: View {
                     HStack {
                         Text(sound.title)
                         Spacer()
+                        Button {
+                            viewModel.toggleFavorite(sound)
+                        } label: {
+                            Image(systemName: viewModel.isFavorite(sound) ? "star.fill" : "star")
+                                .foregroundStyle(DreamNestTheme.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(viewModel.isFavorite(sound) ? "Remove favorite" : "Add favorite")
+
                         if viewModel.selectedSound.id == sound.id {
                             Image(systemName: "checkmark.circle.fill")
                         }
@@ -160,6 +170,35 @@ struct HomeView: View {
         .background(DreamNestTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
+
+    private var recentSoundsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Recent")
+                .foregroundStyle(DreamNestTheme.primaryText)
+
+            if viewModel.recentSounds.isEmpty {
+                Text("Your last selected sounds appear here.")
+                    .foregroundStyle(DreamNestTheme.secondaryText)
+                    .font(.footnote)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(viewModel.recentSounds) { sound in
+                            Button(sound.title) { viewModel.selectSound(sound) }
+                                .foregroundStyle(DreamNestTheme.primaryText)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(DreamNestTheme.cardBackground.opacity(0.9))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(DreamNestTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
 }
 
 #Preview {
@@ -178,6 +217,8 @@ private final class PreviewAudioService: AudioPlaybackControlling {
     var playbackStatePublisher: AnyPublisher<AudioPlaybackState, Never> { Just(.idle).eraseToAnyPublisher() }
     func configureSession() throws {}
     func play(sound: SoundDefinition, volume: Float) async throws {}
+    func pause() {}
+    func resume() {}
     func updateVolume(_ volume: Float, rampDuration: TimeInterval) {}
     func stop(fadeDuration: TimeInterval) async {}
 }

@@ -47,6 +47,8 @@ public struct PremiumState: Codable, Equatable, Sendable {
 public struct AppSettings: Codable, Equatable, Sendable {
     public var lastSoundID: String
     public var lastVolume: Float
+    public var favoriteSoundIDs: Set<String>
+    public var recentSoundIDs: [String]
     public var timer: TimerSettings
     public var cryResponse: CryResponseSettings
     public var premium: PremiumState
@@ -55,6 +57,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public init(
         lastSoundID: String = "white-noise",
         lastVolume: Float = 0.35,
+        favoriteSoundIDs: Set<String> = [],
+        recentSoundIDs: [String] = [],
         timer: TimerSettings = .init(),
         cryResponse: CryResponseSettings = .init(),
         premium: PremiumState = .init(),
@@ -62,6 +66,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     ) {
         self.lastSoundID = lastSoundID
         self.lastVolume = lastVolume
+        self.favoriteSoundIDs = favoriteSoundIDs
+        self.recentSoundIDs = recentSoundIDs
         self.timer = timer
         self.cryResponse = cryResponse
         self.premium = premium
@@ -71,6 +77,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case lastSoundID
         case lastVolume
+        case favoriteSoundIDs
+        case recentSoundIDs
         case timer
         case cryResponse
         case premium
@@ -82,6 +90,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         lastSoundID = try container.decodeIfPresent(String.self, forKey: .lastSoundID) ?? "white-noise"
         lastVolume = try container.decodeIfPresent(Float.self, forKey: .lastVolume) ?? 0.35
+        favoriteSoundIDs = try container.decodeIfPresent(Set<String>.self, forKey: .favoriteSoundIDs) ?? []
+        recentSoundIDs = try container.decodeIfPresent([String].self, forKey: .recentSoundIDs) ?? []
         timer = try container.decodeIfPresent(TimerSettings.self, forKey: .timer) ?? .init()
         cryResponse = try container.decodeIfPresent(CryResponseSettings.self, forKey: .cryResponse) ?? .init()
         premium = try container.decodeIfPresent(PremiumState.self, forKey: .premium) ?? .init()
@@ -98,6 +108,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(lastSoundID, forKey: .lastSoundID)
         try container.encode(lastVolume, forKey: .lastVolume)
+        try container.encode(favoriteSoundIDs, forKey: .favoriteSoundIDs)
+        try container.encode(recentSoundIDs, forKey: .recentSoundIDs)
         try container.encode(timer, forKey: .timer)
         try container.encode(cryResponse, forKey: .cryResponse)
         try container.encode(premium, forKey: .premium)

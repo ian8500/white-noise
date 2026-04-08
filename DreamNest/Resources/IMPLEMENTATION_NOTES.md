@@ -25,9 +25,10 @@
 - Updates lock-screen metadata via `MPNowPlayingInfoCenter`.
 
 ## Next-step checklist
-1. Add remote transport controls with `MPRemoteCommandCenter`.
-2. Add real EQ pipeline using `AVAudioEngine` + `AVAudioUnitEQ`.
-3. Add layered mixer abstraction (`Track`, `MixerGraph`) for multi-sound scenes.
-4. Move persistence to SwiftData/CoreData if event history grows.
-5. Add analytics only after privacy review and explicit opt-in.
-6. Add XCTest UI snapshots for dark-mode accessibility validation.
+1. ✅ Add remote transport controls with `MPRemoteCommandCenter` (play/pause handlers are now wired in playback service).
+2. ✅ Add favorites + recent sounds persistence for faster repeat bedtime setup.
+3. Add real EQ pipeline using `AVAudioEngine` + `AVAudioUnitEQ`.
+4. Add layered mixer abstraction (`Track`, `MixerGraph`) for multi-sound scenes.
+5. Move persistence to SwiftData/CoreData if event history grows.
+6. Add analytics only after privacy review and explicit opt-in.
+7. Add XCTest UI snapshots for dark-mode accessibility validation.
