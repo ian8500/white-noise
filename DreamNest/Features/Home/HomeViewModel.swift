@@ -9,6 +9,8 @@ final class HomeViewModel: ObservableObject {
     @Published var isPlaying = false
     @Published var warningBanner: String?
     @Published var cryModeEnabled: Bool
+    @Published private(set) var favoriteSoundIDs: Set<String>
+    @Published private(set) var recentSoundIDs: [String]
 
     let catalog: [SoundDefinition]
 
@@ -42,6 +44,8 @@ final class HomeViewModel: ObservableObject {
         selectedSound = catalogService.sound(id: settings.lastSoundID) ?? catalogService.sounds[0]
         volume = settings.lastVolume
         cryModeEnabled = settings.cryResponse.enabled
+        favoriteSoundIDs = settings.favoriteSoundIDs
+        recentSoundIDs = settings.recentSoundIDs
 
         bind()
     }
@@ -69,7 +73,31 @@ final class HomeViewModel: ObservableObject {
     func selectSound(_ sound: SoundDefinition) {
         selectedSound = sound
         settings.lastSoundID = sound.id
+        settings.recentSoundIDs.removeAll(where: { $0 == sound.id })
+        settings.recentSoundIDs.insert(sound.id, at: 0)
+        settings.recentSoundIDs = Array(settings.recentSoundIDs.prefix(5))
+        recentSoundIDs = settings.recentSoundIDs
         store.save(settings)
+    }
+
+    func toggleFavorite(_ sound: SoundDefinition) {
+        if settings.favoriteSoundIDs.contains(sound.id) {
+            settings.favoriteSoundIDs.remove(sound.id)
+        } else {
+            settings.favoriteSoundIDs.insert(sound.id)
+        }
+        favoriteSoundIDs = settings.favoriteSoundIDs
+        store.save(settings)
+    }
+
+    func isFavorite(_ sound: SoundDefinition) -> Bool {
+        favoriteSoundIDs.contains(sound.id)
+    }
+
+    var recentSounds: [SoundDefinition] {
+        recentSoundIDs.compactMap { id in
+            catalog.first(where: { $0.id == id })
+        }
     }
 
     func applyTimerPreset(minutes: Int) {
