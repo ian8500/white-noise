@@ -18,6 +18,7 @@ final class HomeViewModel: ObservableObject {
     private let store: SettingsStoring
     private let cryService: CryDetectionControlling
     private let safetyPolicy: NoiseSafetyPolicy
+    private let cryResponseCoordinator: CryResponseCoordinator
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -26,7 +27,8 @@ final class HomeViewModel: ObservableObject {
         timer: SleepTimerScheduling,
         store: SettingsStoring,
         cryService: CryDetectionControlling,
-        safetyPolicy: NoiseSafetyPolicy
+        safetyPolicy: NoiseSafetyPolicy,
+        cryResponseCoordinator: CryResponseCoordinator
     ) {
         self.catalog = catalogService.sounds
         self.audio = audio
@@ -34,6 +36,7 @@ final class HomeViewModel: ObservableObject {
         self.store = store
         self.cryService = cryService
         self.safetyPolicy = safetyPolicy
+        self.cryResponseCoordinator = cryResponseCoordinator
 
         settings = store.load()
         selectedSound = catalogService.sound(id: settings.lastSoundID) ?? catalogService.sounds[0]
@@ -66,6 +69,16 @@ final class HomeViewModel: ObservableObject {
     func selectSound(_ sound: SoundDefinition) {
         selectedSound = sound
         settings.lastSoundID = sound.id
+        store.save(settings)
+    }
+
+    func applyTimerPreset(minutes: Int) {
+        settings.timer.duration = TimeInterval(minutes * 60)
+        store.save(settings)
+    }
+
+    func updateFadeDuration(seconds: TimeInterval) {
+        settings.timer.fadeDuration = max(5, min(180, seconds))
         store.save(settings)
     }
 
@@ -111,11 +124,21 @@ final class HomeViewModel: ObservableObject {
         cryService.detectionPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] signal in
-                guard let self, signal.detected, settings.cryResponse.enabled else { return }
-                let newVolume = safetyPolicy.clamped(volume: volume + settings.cryResponse.volumeBoostStep)
-                setVolume(newVolume)
-                timer.extend(by: settings.cryResponse.timerExtension)
-                store.appendCryEvent(.init(confidence: signal.confidence))
+                guard let self,
+                      let action = cryResponseCoordinator.handle(
+                          signal: signal,
+                          isEnabled: settings.cryResponse.enabled,
+                          settings: settings.cryResponse,
+                          currentVolume: volume,
+                          safetyPolicy: safetyPolicy
+                      )
+                else { return }
+
+                setVolume(action.targetVolume)
+                timer.extend(by: action.timerExtension)
+                if action.shouldRecordEvent {
+                    store.appendCryEvent(.init(confidence: signal.confidence))
+                }
             }
             .store(in: &cancellables)
     }
