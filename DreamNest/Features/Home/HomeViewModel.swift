@@ -111,7 +111,7 @@ final class HomeViewModel: ObservableObject {
                 timerRemaining = state.remaining
                 if !state.isRunning {
                     isPlaying = false
-                    Task { await audio.stop(fadeDuration: 0.3) }
+                    Task { await self.audio.stop(fadeDuration: 0.3) }
                 }
 
                 let fadeGain = FadeCurve.gain(remaining: state.remaining, fadeDuration: state.fadeDuration)
