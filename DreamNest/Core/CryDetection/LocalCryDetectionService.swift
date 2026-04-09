@@ -7,6 +7,7 @@ public final class LocalCryDetectionService: CryDetectionControlling {
     private let engine = AVAudioEngine()
     private let stateMachine: CryDetectionStateMachine
     private let subject = PassthroughSubject<CryDetectionSignal, Never>()
+    private var isRunning = false
 
     public var detectionPublisher: AnyPublisher<CryDetectionSignal, Never> { subject.eraseToAnyPublisher() }
 
@@ -23,6 +24,7 @@ public final class LocalCryDetectionService: CryDetectionControlling {
     }
 
     public func start() throws {
+        guard !isRunning else { return }
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
 
@@ -37,11 +39,18 @@ public final class LocalCryDetectionService: CryDetectionControlling {
 
         engine.prepare()
         try engine.start()
+        isRunning = true
     }
 
     public func stop() {
+        guard isRunning else { return }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
+        isRunning = false
+    }
+
+    public func updateDetectionThreshold(_ threshold: Float) {
+        stateMachine.updateDetectionThreshold(threshold)
     }
 
     private func extractFeatures(from buffer: AVAudioPCMBuffer, sampleRate: Float) -> CryHeuristicFrame? {

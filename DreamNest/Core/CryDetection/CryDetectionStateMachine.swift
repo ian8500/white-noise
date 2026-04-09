@@ -19,24 +19,30 @@ public final class CryDetectionStateMachine {
         public var rmsThreshold: Float
         public var centroidThresholdHz: Float
         public var bandEnergyThreshold: Float
+        public var confidenceTriggerThreshold: Float
         public var persistenceFrames: Int
         public var cooldown: TimeInterval
 
-        public init(rmsThreshold: Float = 0.018, centroidThresholdHz: Float = 900, bandEnergyThreshold: Float = 0.42, persistenceFrames: Int = 10, cooldown: TimeInterval = 120) {
+        public init(rmsThreshold: Float = 0.018, centroidThresholdHz: Float = 900, bandEnergyThreshold: Float = 0.42, confidenceTriggerThreshold: Float = 0.68, persistenceFrames: Int = 10, cooldown: TimeInterval = 120) {
             self.rmsThreshold = rmsThreshold
             self.centroidThresholdHz = centroidThresholdHz
             self.bandEnergyThreshold = bandEnergyThreshold
+            self.confidenceTriggerThreshold = confidenceTriggerThreshold
             self.persistenceFrames = persistenceFrames
             self.cooldown = cooldown
         }
     }
 
-    private let config: Config
+    private var config: Config
     private var highConfidenceCount = 0
     private var lastTriggerDate: Date?
 
     public init(config: Config = .init()) {
         self.config = config
+    }
+
+    public func updateDetectionThreshold(_ threshold: Float) {
+        config.confidenceTriggerThreshold = max(0.4, min(threshold, 0.95))
     }
 
     public func process(_ frame: CryHeuristicFrame) -> CryDetectionSignal {
@@ -50,7 +56,7 @@ public final class CryDetectionStateMachine {
         let bandScore = min(1, frame.bandEnergyRatio / config.bandEnergyThreshold)
         let confidence = max(0, min(1, 0.45 * amplitudeScore + 0.3 * centroidScore + 0.25 * bandScore))
 
-        if confidence >= 0.78 {
+        if confidence >= config.confidenceTriggerThreshold {
             highConfidenceCount += 1
         } else {
             highConfidenceCount = max(0, highConfidenceCount - 1)

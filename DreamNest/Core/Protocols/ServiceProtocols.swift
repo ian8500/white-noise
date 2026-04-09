@@ -37,6 +37,7 @@ public protocol CryDetectionControlling: AnyObject {
     func requestPermission() async -> Bool
     func start() throws
     func stop()
+    func updateDetectionThreshold(_ threshold: Float)
 }
 
 public struct CryDetectionSignal: Equatable, Sendable {

@@ -15,12 +15,32 @@ public struct CryResponseSettings: Codable, Equatable, Sendable {
     public var volumeBoostStep: Float
     public var timerExtension: TimeInterval
     public var cooldown: TimeInterval
+    public var detectionThreshold: Float
 
-    public init(enabled: Bool = false, volumeBoostStep: Float = 0.08, timerExtension: TimeInterval = 10 * 60, cooldown: TimeInterval = 120) {
+    public init(enabled: Bool = false, volumeBoostStep: Float = 0.08, timerExtension: TimeInterval = 10 * 60, cooldown: TimeInterval = 30, detectionThreshold: Float = 0.68) {
         self.enabled = enabled
         self.volumeBoostStep = volumeBoostStep
         self.timerExtension = timerExtension
         self.cooldown = cooldown
+        self.detectionThreshold = max(0.4, min(detectionThreshold, 0.95))
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case enabled
+        case volumeBoostStep
+        case timerExtension
+        case cooldown
+        case detectionThreshold
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        volumeBoostStep = try container.decodeIfPresent(Float.self, forKey: .volumeBoostStep) ?? 0.08
+        timerExtension = try container.decodeIfPresent(TimeInterval.self, forKey: .timerExtension) ?? 10 * 60
+        cooldown = try container.decodeIfPresent(TimeInterval.self, forKey: .cooldown) ?? 30
+        let threshold = try container.decodeIfPresent(Float.self, forKey: .detectionThreshold) ?? 0.68
+        detectionThreshold = max(0.4, min(threshold, 0.95))
     }
 }
 

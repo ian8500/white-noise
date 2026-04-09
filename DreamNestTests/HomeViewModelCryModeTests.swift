@@ -125,6 +125,7 @@ private final class CryServiceSpy: CryDetectionControlling {
     func requestPermission() async -> Bool { true }
     func start() throws {}
     func stop() {}
+    func updateDetectionThreshold(_ threshold: Float) {}
 
     func emit(_ signal: CryDetectionSignal) {
         subject.send(signal)

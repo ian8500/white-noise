@@ -17,7 +17,12 @@ struct AppEnvironment {
                 timer: timer,
                 store: store,
                 cryService: LocalCryDetectionService(
-                    stateMachine: CryDetectionStateMachine(config: .init(cooldown: settings.cryResponse.cooldown))
+                    stateMachine: CryDetectionStateMachine(
+                        config: .init(
+                            confidenceTriggerThreshold: settings.cryResponse.detectionThreshold,
+                            cooldown: settings.cryResponse.cooldown
+                        )
+                    )
                 ),
                 safetyPolicy: NoiseSafetyPolicy(
                     maxGainCap: settings.noiseProtection.maxGainCap,
