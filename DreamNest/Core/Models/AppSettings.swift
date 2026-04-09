@@ -4,7 +4,7 @@ public struct TimerSettings: Codable, Equatable, Sendable {
     public var duration: TimeInterval
     public var fadeDuration: TimeInterval
 
-    public init(duration: TimeInterval = 45 * 60, fadeDuration: TimeInterval = 45) {
+    public init(duration: TimeInterval = 45 * 60, fadeDuration: TimeInterval = 60) {
         self.duration = duration
         self.fadeDuration = fadeDuration
     }
