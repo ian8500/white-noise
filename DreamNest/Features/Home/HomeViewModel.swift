@@ -111,9 +111,19 @@ final class HomeViewModel: ObservableObject {
         store.save(settings)
     }
 
-    func updateFadeDuration(seconds: TimeInterval) {
-        settings.timer.fadeDuration = max(5, min(180, seconds))
+    func adjustTimerDuration(minutesDelta: Int) {
+        let currentMinutes = Int(settings.timer.duration / 60)
+        let updatedMinutes = max(1, currentMinutes + minutesDelta)
+        settings.timer.duration = TimeInterval(updatedMinutes * 60)
         store.save(settings)
+    }
+
+    var formattedTimerRemaining: String {
+        Self.formatAsMinutesAndSeconds(timerRemaining)
+    }
+
+    var formattedTimerDuration: String {
+        Self.formatAsMinutesAndSeconds(settings.timer.duration)
     }
 
     func toggleCryMode(_ enabled: Bool) {
@@ -175,5 +185,12 @@ final class HomeViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    private static func formatAsMinutesAndSeconds(_ seconds: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(seconds.rounded()))
+        let minutes = totalSeconds / 60
+        let remainingSeconds = totalSeconds % 60
+        return String(format: "%02d:%02d", minutes, remainingSeconds)
     }
 }

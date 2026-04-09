@@ -61,20 +61,24 @@ struct HomeView: View {
             Text("Sleep Timer")
                 .foregroundStyle(DreamNestTheme.primaryText)
             HStack {
-                timerPresetButton("30m", minutes: 30)
-                timerPresetButton("45m", minutes: 45)
                 timerPresetButton("60m", minutes: 60)
+                timerPresetButton("30m", minutes: 30)
+                timerPresetButton("15m", minutes: 15)
             }
-
             HStack {
-                Text("Fade")
-                Spacer()
-                Button("15s") { viewModel.updateFadeDuration(seconds: 15) }
-                Button("30s") { viewModel.updateFadeDuration(seconds: 30) }
-                Button("60s") { viewModel.updateFadeDuration(seconds: 60) }
+                timerAdjustButton("-10m", minutesDelta: -10)
+                timerAdjustButton("-5m", minutesDelta: -5)
+                timerAdjustButton("-1m", minutesDelta: -1)
             }
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(DreamNestTheme.secondaryText)
+            HStack {
+                timerAdjustButton("+10m", minutesDelta: 10)
+                timerAdjustButton("+5m", minutesDelta: 5)
+                timerAdjustButton("+1m", minutesDelta: 1)
+            }
+            Text("Duration: \(viewModel.formattedTimerDuration)")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(DreamNestTheme.secondaryText)
+
         }
         .padding()
         .background(DreamNestTheme.cardBackground)
@@ -91,6 +95,16 @@ struct HomeView: View {
             .accessibilityLabel("Set timer to \(minutes) minutes")
     }
 
+    private func timerAdjustButton(_ title: String, minutesDelta: Int) -> some View {
+        Button(title) { viewModel.adjustTimerDuration(minutesDelta: minutesDelta) }
+            .foregroundStyle(DreamNestTheme.primaryText)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(DreamNestTheme.cardBackground.opacity(0.9))
+            .clipShape(Capsule())
+            .accessibilityLabel("\(minutesDelta >= 0 ? "Increase" : "Decrease") timer by \(abs(minutesDelta)) minutes")
+    }
+
     private var volumeCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Volume")
@@ -102,10 +116,10 @@ struct HomeView: View {
             .accessibilityLabel("Playback volume")
             .accessibilityValue("\(Int(viewModel.volume * 100)) percent")
 
-            Text("\(Int(viewModel.timerRemaining))s remaining")
+            Text("\(viewModel.formattedTimerRemaining) remaining")
                 .foregroundStyle(DreamNestTheme.secondaryText)
                 .font(.footnote)
-                .accessibilityLabel("\(Int(viewModel.timerRemaining)) seconds remaining")
+                .accessibilityLabel("\(viewModel.formattedTimerRemaining) remaining")
         }
         .padding()
         .background(DreamNestTheme.cardBackground)
