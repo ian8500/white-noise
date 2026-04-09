@@ -3,6 +3,9 @@ import Foundation
 
 @MainActor
 final class HomeViewModel: ObservableObject {
+    private static let cryTriggeredPlaybackDuration: TimeInterval = 5 * 60
+    private static let cryTriggeredSoundID = "white-noise"
+
     @Published var selectedSound: SoundDefinition
     @Published var volume: Float
     @Published var timerRemaining: TimeInterval = 0
@@ -48,6 +51,7 @@ final class HomeViewModel: ObservableObject {
         recentSoundIDs = settings.recentSoundIDs
 
         bind()
+        startCryMonitoringIfNeeded()
     }
 
     func quickStart() {
@@ -158,14 +162,7 @@ final class HomeViewModel: ObservableObject {
 
         Task {
             if enabled {
-                let granted = await cryService.requestPermission()
-                guard granted else {
-                    cryModeEnabled = false
-                    settings.cryResponse.enabled = false
-                    warningBanner = "Microphone permission is required for cry response mode."
-                    return
-                }
-                try? cryService.start()
+                await requestPermissionAndStartCryService()
             } else {
                 cryService.stop()
             }
@@ -204,7 +201,11 @@ final class HomeViewModel: ObservableObject {
                 else { return }
 
                 setVolume(action.targetVolume)
-                timer.extend(by: action.timerExtension)
+                if isPlaying {
+                    timer.extend(by: action.timerExtension)
+                } else {
+                    startCryTriggeredPlayback()
+                }
                 if action.shouldRecordEvent {
                     store.appendCryEvent(.init(confidence: signal.confidence))
                 }
@@ -236,5 +237,46 @@ final class HomeViewModel: ObservableObject {
         let maxReduction = timerRemaining - 60
         let clampedReduction = max(delta, -maxReduction)
         timer.extend(by: clampedReduction)
+    }
+
+    private func startCryMonitoringIfNeeded() {
+        guard settings.cryResponse.enabled else { return }
+        Task { await requestPermissionAndStartCryService() }
+    }
+
+    private func requestPermissionAndStartCryService() async {
+        let granted = await cryService.requestPermission()
+        guard granted else {
+            cryModeEnabled = false
+            settings.cryResponse.enabled = false
+            warningBanner = "Microphone permission is required for cry response mode."
+            store.save(settings)
+            return
+        }
+
+        do {
+            try cryService.start()
+        } catch {
+            cryModeEnabled = false
+            settings.cryResponse.enabled = false
+            warningBanner = "Unable to start cry detection: \(error.localizedDescription)"
+            store.save(settings)
+        }
+    }
+
+    private func startCryTriggeredPlayback() {
+        let targetSound = catalog.first(where: { $0.id == Self.cryTriggeredSoundID }) ?? selectedSound
+
+        Task {
+            do {
+                try audio.configureSession(micModeEnabled: true)
+                try await audio.play(sound: targetSound, volume: safetyPolicy.clamped(volume: volume))
+                timer.start(duration: Self.cryTriggeredPlaybackDuration, fadeDuration: settings.timer.fadeDuration)
+                isPlaying = true
+            } catch {
+                isPlaying = false
+                warningBanner = "Cry response playback failed: \(error.localizedDescription)"
+            }
+        }
     }
 }
