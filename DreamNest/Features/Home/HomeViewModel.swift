@@ -65,6 +65,15 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
+    func stopPlayback() {
+        timer.cancel()
+        cryService.stop()
+        Task {
+            await audio.stop(fadeDuration: 0.3)
+            isPlaying = false
+        }
+    }
+
     func setVolume(_ value: Float) {
         let clamped = safetyPolicy.clamped(volume: value)
         if safetyPolicy.shouldWarn(for: value) {
