@@ -118,6 +118,7 @@ final class HomeViewModel: ObservableObject {
     func applyTimerPreset(minutes: Int) {
         settings.timer.duration = TimeInterval(minutes * 60)
         store.save(settings)
+        updateRunningTimerForDurationChange(targetDuration: settings.timer.duration)
     }
 
     func adjustTimerDuration(minutesDelta: Int) {
@@ -125,6 +126,7 @@ final class HomeViewModel: ObservableObject {
         let updatedMinutes = max(1, currentMinutes + minutesDelta)
         settings.timer.duration = TimeInterval(updatedMinutes * 60)
         store.save(settings)
+        updateRunningTimerForDurationChange(targetDuration: settings.timer.duration)
     }
 
     var formattedTimerRemaining: String {
@@ -201,5 +203,24 @@ final class HomeViewModel: ObservableObject {
         let minutes = totalSeconds / 60
         let remainingSeconds = totalSeconds % 60
         return String(format: "%02d:%02d", minutes, remainingSeconds)
+    }
+
+    private func updateRunningTimerForDurationChange(targetDuration: TimeInterval) {
+        guard isPlaying else { return }
+
+        if timerRemaining <= 0 {
+            timer.start(duration: targetDuration, fadeDuration: settings.timer.fadeDuration)
+            return
+        }
+
+        let delta = targetDuration - timerRemaining
+        if delta >= 0 {
+            timer.extend(by: delta)
+            return
+        }
+
+        let maxReduction = timerRemaining - 60
+        let clampedReduction = max(delta, -maxReduction)
+        timer.extend(by: clampedReduction)
     }
 }
