@@ -137,6 +137,20 @@ final class HomeViewModel: ObservableObject {
         Self.formatAsMinutesAndSeconds(settings.timer.duration)
     }
 
+    var timerCountdownTitle: String {
+        if isPlaying, timerRemaining > 0 {
+            return "\(formattedTimerRemaining) remaining"
+        }
+        return "Ready: \(formattedTimerDuration)"
+    }
+
+    var timerCountdownSubtitle: String {
+        if isPlaying, timerRemaining > 0 {
+            return "Playback stops automatically when countdown reaches 00:00."
+        }
+        return "Starts from \(formattedTimerDuration) when you begin a sleep session."
+    }
+
     func toggleCryMode(_ enabled: Bool) {
         cryModeEnabled = enabled
         settings.cryResponse.enabled = enabled
