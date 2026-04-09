@@ -266,4 +266,5 @@ private final class PreviewCryService: CryDetectionControlling {
     func requestPermission() async -> Bool { true }
     func start() throws {}
     func stop() {}
+    func updateDetectionThreshold(_ threshold: Float) {}
 }

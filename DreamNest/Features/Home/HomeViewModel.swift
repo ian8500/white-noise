@@ -12,6 +12,7 @@ final class HomeViewModel: ObservableObject {
     @Published var isPlaying = false
     @Published var warningBanner: String?
     @Published var cryModeEnabled: Bool
+    @Published var cryDetectionThreshold: Float
     @Published private(set) var favoriteSoundIDs: Set<String>
     @Published private(set) var recentSoundIDs: [String]
 
@@ -47,10 +48,12 @@ final class HomeViewModel: ObservableObject {
         selectedSound = catalogService.sound(id: settings.lastSoundID) ?? catalogService.sounds[0]
         volume = settings.lastVolume
         cryModeEnabled = settings.cryResponse.enabled
+        cryDetectionThreshold = settings.cryResponse.detectionThreshold
         favoriteSoundIDs = settings.favoriteSoundIDs
         recentSoundIDs = settings.recentSoundIDs
 
         bind()
+        cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
         startCryMonitoringIfNeeded()
     }
 
@@ -71,7 +74,6 @@ final class HomeViewModel: ObservableObject {
 
     func stopPlayback() {
         timer.cancel()
-        cryService.stop()
         Task {
             await audio.stop(fadeDuration: 0.3)
             isPlaying = false
@@ -169,6 +171,14 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
+    func setCryDetectionThreshold(_ value: Float) {
+        let clamped = max(0.4, min(value, 0.95))
+        cryDetectionThreshold = clamped
+        settings.cryResponse.detectionThreshold = clamped
+        cryService.updateDetectionThreshold(clamped)
+        store.save(settings)
+    }
+
     private func bind() {
         timer.statePublisher
             .receive(on: DispatchQueue.main)
@@ -255,6 +265,7 @@ final class HomeViewModel: ObservableObject {
         }
 
         do {
+            cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
             try cryService.start()
         } catch {
             cryModeEnabled = false

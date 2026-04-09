@@ -93,4 +93,5 @@ private final class CryStub: CryDetectionControlling {
     func requestPermission() async -> Bool { true }
     func start() throws {}
     func stop() {}
+    func updateDetectionThreshold(_ threshold: Float) {}
 }
