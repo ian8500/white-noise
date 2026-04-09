@@ -81,6 +81,17 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Sleep Timer")
                 .foregroundStyle(DreamNestTheme.primaryText)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(viewModel.timerCountdownTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DreamNestTheme.primaryText)
+                Text(viewModel.timerCountdownSubtitle)
+                    .font(.footnote)
+                    .foregroundStyle(DreamNestTheme.secondaryText)
+            }
+            .padding(.vertical, 2)
+
             HStack {
                 timerPresetButton("60m", minutes: 60)
                 timerPresetButton("30m", minutes: 30)
@@ -136,11 +147,6 @@ struct HomeView: View {
             ), in: 0 ... 1)
             .accessibilityLabel("Playback volume")
             .accessibilityValue("\(Int(viewModel.volume * 100)) percent")
-
-            Text("\(viewModel.formattedTimerRemaining) remaining")
-                .foregroundStyle(DreamNestTheme.secondaryText)
-                .font(.footnote)
-                .accessibilityLabel("\(viewModel.formattedTimerRemaining) remaining")
         }
         .padding()
         .background(DreamNestTheme.cardBackground)
