@@ -54,6 +54,7 @@ final class HomeViewModel: ObservableObject {
 
         bind()
         cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
+        cryService.updateCooldown(settings.cryResponse.cooldown)
         startCryMonitoringIfNeeded()
     }
 
@@ -266,6 +267,7 @@ final class HomeViewModel: ObservableObject {
 
         do {
             cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
+            cryService.updateCooldown(settings.cryResponse.cooldown)
             try cryService.start()
         } catch {
             cryModeEnabled = false

@@ -94,4 +94,5 @@ private final class CryStub: CryDetectionControlling {
     func start() throws {}
     func stop() {}
     func updateDetectionThreshold(_ threshold: Float) {}
+    func updateCooldown(_ cooldown: TimeInterval) {}
 }

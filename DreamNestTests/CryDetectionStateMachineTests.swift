@@ -26,4 +26,16 @@ final class CryDetectionStateMachineTests: XCTestCase {
         XCTAssertTrue(first.detected)
         XCTAssertFalse(second.detected)
     }
+
+    func testUpdatingCooldownAllowsFasterRetrigger() {
+        let machine = CryDetectionStateMachine(config: .init(persistenceFrames: 1, cooldown: 120))
+        let now = Date()
+
+        let first = machine.process(.init(rms: 0.03, centroid: 1500, bandEnergyRatio: 0.8, timestamp: now))
+        machine.updateCooldown(1)
+        let second = machine.process(.init(rms: 0.03, centroid: 1500, bandEnergyRatio: 0.8, timestamp: now.addingTimeInterval(2)))
+
+        XCTAssertTrue(first.detected)
+        XCTAssertTrue(second.detected)
+    }
 }

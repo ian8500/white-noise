@@ -126,6 +126,7 @@ private final class CryServiceSpy: CryDetectionControlling {
     func start() throws {}
     func stop() {}
     func updateDetectionThreshold(_ threshold: Float) {}
+    func updateCooldown(_ cooldown: TimeInterval) {}
 
     func emit(_ signal: CryDetectionSignal) {
         subject.send(signal)
