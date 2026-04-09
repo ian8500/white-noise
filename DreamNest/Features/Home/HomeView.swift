@@ -12,6 +12,7 @@ struct HomeView: View {
                 VStack(spacing: 18) {
                     header
                     quickStartButton
+                    stopButton
                     recentSoundsCard
                     timerCard
                     volumeCard
@@ -53,6 +54,26 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Starts the selected sound with your configured timer.")
+    }
+
+    private var stopButton: some View {
+        Button(action: viewModel.stopPlayback) {
+            Label("Stop", systemImage: "stop.fill")
+                .font(.headline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(DreamNestTheme.cardBackground.opacity(0.95))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(DreamNestTheme.secondaryText.opacity(0.3), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(!viewModel.isPlaying)
+        .opacity(viewModel.isPlaying ? 1 : 0.55)
+        .foregroundStyle(DreamNestTheme.primaryText)
+        .accessibilityHint("Stops audio playback and cancels the active timer.")
     }
 
 
