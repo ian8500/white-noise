@@ -38,6 +38,7 @@ public protocol CryDetectionControlling: AnyObject {
     func start() throws
     func stop()
     func updateDetectionThreshold(_ threshold: Float)
+    func updateCooldown(_ cooldown: TimeInterval)
 }
 
 public struct CryDetectionSignal: Equatable, Sendable {

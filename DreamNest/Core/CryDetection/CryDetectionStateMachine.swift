@@ -45,6 +45,10 @@ public final class CryDetectionStateMachine {
         config.confidenceTriggerThreshold = max(0.4, min(threshold, 0.95))
     }
 
+    public func updateCooldown(_ cooldown: TimeInterval) {
+        config.cooldown = max(0, cooldown)
+    }
+
     public func process(_ frame: CryHeuristicFrame) -> CryDetectionSignal {
         if let lastTriggerDate,
            frame.timestamp.timeIntervalSince(lastTriggerDate) < config.cooldown {

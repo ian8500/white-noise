@@ -53,6 +53,10 @@ public final class LocalCryDetectionService: CryDetectionControlling {
         stateMachine.updateDetectionThreshold(threshold)
     }
 
+    public func updateCooldown(_ cooldown: TimeInterval) {
+        stateMachine.updateCooldown(cooldown)
+    }
+
     private func extractFeatures(from buffer: AVAudioPCMBuffer, sampleRate: Float) -> CryHeuristicFrame? {
         guard let samples = buffer.floatChannelData?[0] else { return nil }
         let count = Int(buffer.frameLength)
