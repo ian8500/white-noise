@@ -107,10 +107,6 @@ struct HomeView: View {
                 timerAdjustButton("+5m", minutesDelta: 5)
                 timerAdjustButton("+1m", minutesDelta: 1)
             }
-            Text("Duration: \(viewModel.formattedTimerDuration)")
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(DreamNestTheme.secondaryText)
-
         }
         .padding()
         .background(DreamNestTheme.cardBackground)
