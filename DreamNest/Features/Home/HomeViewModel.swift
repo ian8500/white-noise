@@ -24,6 +24,8 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var recentCryEvents: [CryEventRow] = []
     @Published private(set) var favoriteSoundIDs: Set<String>
     @Published private(set) var recentSoundIDs: [String]
+    @Published private(set) var routinePresets: [RoutinePreset]
+    @Published private(set) var defaultRoutinePresetID: UUID?
 
     let catalog: [SoundDefinition]
 
@@ -68,6 +70,15 @@ final class HomeViewModel: ObservableObject {
         recentSoundIDs = settings.recentSoundIDs
         recentCryEvents = store.loadCryEvents(limit: 12).map(CryEventRow.init)
 
+        if settings.routinePresets.isEmpty {
+            settings.routinePresets = RoutinePreset.seededDefaults(using: settings)
+            settings.defaultRoutinePresetID = settings.routinePresets.first?.id
+            store.save(settings)
+        }
+
+        routinePresets = settings.routinePresets
+        defaultRoutinePresetID = settings.defaultRoutinePresetID
+
         bind()
         cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
         cryService.updateCooldown(settings.cryResponse.cooldown)
@@ -76,18 +87,83 @@ final class HomeViewModel: ObservableObject {
     }
 
     func quickStart() {
-        Task {
-            do {
-                try audio.configureSession(micModeEnabled: cryModeEnabled)
-                try await audio.play(sound: selectedSound, volume: safetyPolicy.clamped(volume: volume))
-                timer.start(duration: settings.timer.duration, fadeDuration: settings.timer.fadeDuration)
-                isPlaying = true
-            } catch {
-                isPlaying = false
-                warningBanner = "Playback failed: \(error.localizedDescription)"
-                homeLogger.error("quickStart failed: \(error.localizedDescription, privacy: .public)")
-            }
+        startRoutine(sound: selectedSound, volume: volume, timerDuration: settings.timer.duration, cryModeEnabled: cryModeEnabled)
+    }
+
+    func startDefaultRoutine() {
+        guard let preset = defaultRoutinePreset else {
+            quickStart()
+            return
         }
+        startRoutine(preset: preset)
+    }
+
+
+    var defaultRoutinePreset: RoutinePreset? {
+        guard let defaultRoutinePresetID else { return nil }
+        return routinePresets.first(where: { $0.id == defaultRoutinePresetID })
+    }
+
+    func startRoutine(preset: RoutinePreset) {
+        applyPreset(preset)
+        startRoutine(sound: selectedSound, volume: volume, timerDuration: settings.timer.duration, cryModeEnabled: cryModeEnabled)
+    }
+
+    func saveCurrentAsPreset(named name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let preset = RoutinePreset(
+            name: trimmed,
+            soundID: selectedSound.id,
+            volume: volume,
+            timerDuration: settings.timer.duration,
+            cryModeEnabled: cryModeEnabled
+        )
+        settings.routinePresets.append(preset)
+        if settings.defaultRoutinePresetID == nil {
+            settings.defaultRoutinePresetID = preset.id
+        }
+        syncRoutineSettings()
+    }
+
+    func renamePreset(id: UUID, name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let index = settings.routinePresets.firstIndex(where: { $0.id == id })
+        else { return }
+        settings.routinePresets[index].name = trimmed
+        syncRoutineSettings()
+    }
+
+    func movePresets(from source: IndexSet, to destination: Int) {
+        let moving = source.sorted().map { settings.routinePresets[$0] }
+        for index in source.sorted(by: >) {
+            settings.routinePresets.remove(at: index)
+        }
+        var insertAt = destination
+        for index in source where index < destination {
+            insertAt -= 1
+        }
+        settings.routinePresets.insert(contentsOf: moving, at: max(0, min(insertAt, settings.routinePresets.count)))
+        syncRoutineSettings()
+    }
+
+    func setDefaultPreset(id: UUID) {
+        guard settings.routinePresets.contains(where: { $0.id == id }) else { return }
+        settings.defaultRoutinePresetID = id
+        syncRoutineSettings()
+    }
+
+    func applyPreset(_ preset: RoutinePreset) {
+        guard catalog.contains(where: { $0.id == preset.soundID }) else { return }
+        if let sound = catalog.first(where: { $0.id == preset.soundID }) {
+            selectSound(sound)
+        }
+        setVolume(preset.volume)
+        settings.timer.duration = preset.timerDuration
+        toggleCryMode(preset.cryModeEnabled)
+        store.save(settings)
     }
 
     func stopPlayback() {
@@ -209,6 +285,27 @@ final class HomeViewModel: ObservableObject {
         settings.cryResponse.detectionThreshold = clamped
         cryService.updateDetectionThreshold(clamped)
         store.save(settings)
+    }
+
+    private func syncRoutineSettings() {
+        routinePresets = settings.routinePresets
+        defaultRoutinePresetID = settings.defaultRoutinePresetID
+        store.save(settings)
+    }
+
+    private func startRoutine(sound: SoundDefinition, volume: Float, timerDuration: TimeInterval, cryModeEnabled: Bool) {
+        Task {
+            do {
+                try audio.configureSession(micModeEnabled: cryModeEnabled)
+                try await audio.play(sound: sound, volume: safetyPolicy.clamped(volume: volume))
+                timer.start(duration: timerDuration, fadeDuration: settings.timer.fadeDuration)
+                isPlaying = true
+            } catch {
+                isPlaying = false
+                warningBanner = "Playback failed: \(error.localizedDescription)"
+                homeLogger.error("quickStart failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     private func bind() {
