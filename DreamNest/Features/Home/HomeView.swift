@@ -133,26 +133,47 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    @ViewBuilder
     private func quickPresetButton(for preset: PlaybackPreset, prominent: Bool) -> some View {
         let config = viewModel.quickPresetConfiguration(for: preset)
-        let button = Button {
-            Task { await viewModel.startPreset(preset) }
-        } label: {
+        let label = HStack(alignment: .center, spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill((prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent).opacity(prominent ? 0.2 : 0.14))
+                    .frame(width: 34, height: 34)
+                Image(systemName: preset == .nap ? "sun.min.fill" : "moon.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent)
+            }
+
             VStack(alignment: .leading, spacing: 4) {
                 Text("Start \(preset.title)")
                     .font(.subheadline.weight(.semibold))
                 Text("\(Int(config.duration / 60))m • Cry \(config.cryModeEnabled ? "On" : "Off")")
                     .font(.caption)
-                    .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.82) : DreamNestTheme.secondaryText)
+                    .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.85) : DreamNestTheme.secondaryText)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 8)
+
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
 
         if prominent {
-            button.buttonStyle(BorderedProminentButtonStyle())
+            Button {
+                Task { await viewModel.startPreset(preset) }
+            } label: {
+                label
+            }
+            .buttonStyle(BorderedProminentButtonStyle())
         } else {
-            button.buttonStyle(BorderedButtonStyle())
+            Button {
+                Task { await viewModel.startPreset(preset) }
+            } label: {
+                label
+            }
+            .buttonStyle(BorderedButtonStyle())
         }
     }
 
