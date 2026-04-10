@@ -469,6 +469,7 @@ final class HomeViewModel: ObservableObject {
         }
 
         do {
+            try audio.configureSession(micModeEnabled: true)
             cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
             cryService.updateCooldown(settings.cryResponse.cooldown)
             try cryService.start()
