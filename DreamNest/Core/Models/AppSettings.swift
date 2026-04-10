@@ -67,10 +67,25 @@ public struct PremiumState: Codable, Equatable, Sendable {
 public struct QuickStartPresetSettings: Codable, Equatable, Sendable {
     public var duration: TimeInterval
     public var cryModeEnabled: Bool
+    public var soundID: String?
 
-    public init(duration: TimeInterval, cryModeEnabled: Bool) {
+    public init(duration: TimeInterval, cryModeEnabled: Bool, soundID: String? = nil) {
         self.duration = max(60, duration)
         self.cryModeEnabled = cryModeEnabled
+        self.soundID = soundID
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case duration
+        case cryModeEnabled
+        case soundID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        duration = max(60, try container.decodeIfPresent(TimeInterval.self, forKey: .duration) ?? 60)
+        cryModeEnabled = try container.decodeIfPresent(Bool.self, forKey: .cryModeEnabled) ?? false
+        soundID = try container.decodeIfPresent(String.self, forKey: .soundID)
     }
 
     public static func `default`(for preset: PlaybackPreset) -> QuickStartPresetSettings {
