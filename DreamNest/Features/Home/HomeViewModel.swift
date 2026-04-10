@@ -113,11 +113,13 @@ final class HomeViewModel: ObservableObject {
 
     func startPreset(_ preset: PlaybackPreset) async {
         let config = quickPresetConfiguration(for: preset)
+        let presetSound = quickPresetSound(for: preset)
         settings.timer.duration = config.duration
+        selectSound(presetSound)
         toggleCryMode(config.cryModeEnabled)
         store.save(settings)
         await startPlayback(
-            sound: selectedSound,
+            sound: presetSound,
             duration: settings.timer.duration,
             micModeEnabled: settings.cryResponse.enabled
         )
@@ -127,7 +129,7 @@ final class HomeViewModel: ObservableObject {
         settings.quickStartPresets[preset.rawValue] ?? .default(for: preset)
     }
 
-    func updateQuickPreset(_ preset: PlaybackPreset, durationMinutes: Int? = nil, cryModeEnabled: Bool? = nil) {
+    func updateQuickPreset(_ preset: PlaybackPreset, durationMinutes: Int? = nil, cryModeEnabled: Bool? = nil, soundID: String? = nil) {
         var config = quickPresetConfiguration(for: preset)
         if let durationMinutes {
             config.duration = TimeInterval(max(1, durationMinutes) * 60)
@@ -135,8 +137,21 @@ final class HomeViewModel: ObservableObject {
         if let cryModeEnabled {
             config.cryModeEnabled = cryModeEnabled
         }
+        if let soundID {
+            config.soundID = soundID
+        }
         settings.quickStartPresets[preset.rawValue] = config
         store.save(settings)
+    }
+
+
+    func quickPresetSound(for preset: PlaybackPreset) -> SoundDefinition {
+        let config = quickPresetConfiguration(for: preset)
+        if let soundID = config.soundID,
+           let sound = catalog.first(where: { $0.id == soundID }) {
+            return sound
+        }
+        return selectedSound
     }
 
     func clearCryEvents() {

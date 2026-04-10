@@ -136,6 +136,7 @@ struct HomeView: View {
     @ViewBuilder
     private func quickPresetButton(for preset: PlaybackPreset, prominent: Bool) -> some View {
         let config = viewModel.quickPresetConfiguration(for: preset)
+        let presetSound = viewModel.quickPresetSound(for: preset)
         let label = HStack(alignment: .center, spacing: 10) {
             ZStack {
                 Circle()
@@ -149,9 +150,10 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Start \(preset.title)")
                     .font(.subheadline.weight(.semibold))
-                Text("\(Int(config.duration / 60))m • Cry \(config.cryModeEnabled ? "On" : "Off")")
+                Text("\(presetSound.title) • \(Int(config.duration / 60))m • Cry \(config.cryModeEnabled ? "On" : "Off")")
                     .font(.caption)
                     .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.85) : DreamNestTheme.secondaryText)
+                    .lineLimit(1)
             }
 
             Spacer(minLength: 0)
@@ -214,6 +216,39 @@ struct HomeView: View {
                     viewModel.updateQuickPreset(preset, durationMinutes: Int(config.duration / 60) + 5)
                 }
             }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Sound")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DreamNestTheme.secondaryText)
+                Menu {
+                    ForEach(viewModel.catalog) { sound in
+                        Button {
+                            viewModel.updateQuickPreset(preset, soundID: sound.id)
+                        } label: {
+                            if viewModel.quickPresetSound(for: preset).id == sound.id {
+                                Label(sound.title, systemImage: "checkmark")
+                            } else {
+                                Text(sound.title)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text(viewModel.quickPresetSound(for: preset).title)
+                            .lineLimit(1)
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(DreamNestTheme.secondaryText)
+                    }
+                    .font(.footnote.weight(.medium))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 9)
+                    .background(DreamNestTheme.background.opacity(0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+            }
+
             Toggle("Enable cry response", isOn: Binding(
                 get: { viewModel.quickPresetConfiguration(for: preset).cryModeEnabled },
                 set: { viewModel.updateQuickPreset(preset, cryModeEnabled: $0) }
