@@ -7,6 +7,8 @@ struct HomeView: View {
     @State private var isPresetConfigExpanded = false
     @State private var isCryEventsExpanded = true
     @State private var showStartRoutineDialog = false
+    @State private var selectedPresetForQuickControls: PlaybackPreset?
+    @State private var suppressNextPresetTap: PlaybackPreset?
 
     var body: some View {
         ZStack {
@@ -36,6 +38,13 @@ struct HomeView: View {
                 startRoutineDialogOverlay
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     .zIndex(2)
+            }
+        }
+        .overlay {
+            if let preset = selectedPresetForQuickControls {
+                presetQuickControlsOverlay(for: preset)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    .zIndex(3)
             }
         }
         .preferredColorScheme(.dark)
@@ -410,6 +419,132 @@ struct HomeView: View {
 
                 Button("Done") {
                     showStartRoutineDialog = false
+                }
+                .font(.headline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(DreamNestTheme.accent)
+                .foregroundStyle(DreamNestTheme.primaryText)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .padding(16)
+            .frame(maxWidth: 420)
+            .background(DreamNestTheme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(DreamNestTheme.secondaryText.opacity(0.2), lineWidth: 1)
+            )
+            .padding(.horizontal, 16)
+            .accessibilityAddTraits(.isModal)
+        }
+    }
+
+    private func presetQuickControlsOverlay(for preset: PlaybackPreset) -> some View {
+        let config = viewModel.quickPresetConfiguration(for: preset)
+        let sound = viewModel.quickPresetSound(for: preset)
+
+        return ZStack {
+            Color.black.opacity(0.55)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    selectedPresetForQuickControls = nil
+                    suppressNextPresetTap = nil
+                }
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(preset.title) Quick Controls")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(DreamNestTheme.primaryText)
+                        Text("Fine-tune duration, sound, and cry response.")
+                            .font(.footnote)
+                            .foregroundStyle(DreamNestTheme.secondaryText)
+                    }
+                    Spacer()
+                    Button {
+                        selectedPresetForQuickControls = nil
+                        suppressNextPresetTap = nil
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(DreamNestTheme.primaryText)
+                            .padding(8)
+                            .background(DreamNestTheme.background.opacity(0.85))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Duration")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(DreamNestTheme.secondaryText)
+                    HStack(spacing: 8) {
+                        timerStepButton(title: "-5m") {
+                            let updated = max(1, Int(config.duration / 60) - 5)
+                            viewModel.updateQuickPreset(preset, durationMinutes: updated)
+                        }
+                        timerStepButton(title: "-1m") {
+                            let updated = max(1, Int(config.duration / 60) - 1)
+                            viewModel.updateQuickPreset(preset, durationMinutes: updated)
+                        }
+                        timerStepButton(title: "+1m") {
+                            viewModel.updateQuickPreset(preset, durationMinutes: Int(config.duration / 60) + 1)
+                        }
+                        timerStepButton(title: "+5m") {
+                            viewModel.updateQuickPreset(preset, durationMinutes: Int(config.duration / 60) + 5)
+                        }
+                    }
+                    Text("Current: \(Int(config.duration / 60)) minutes")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(DreamNestTheme.primaryText)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Sound")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(DreamNestTheme.secondaryText)
+                    Menu {
+                        ForEach(viewModel.catalog) { candidate in
+                            Button {
+                                viewModel.updateQuickPreset(preset, soundID: candidate.id)
+                            } label: {
+                                if sound.id == candidate.id {
+                                    Label(candidate.title, systemImage: "checkmark")
+                                } else {
+                                    Text(candidate.title)
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(sound.title)
+                                .lineLimit(1)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(DreamNestTheme.secondaryText)
+                        }
+                        .font(.footnote.weight(.medium))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 9)
+                        .background(DreamNestTheme.background.opacity(0.8))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                }
+
+                Toggle("Enable cry response", isOn: Binding(
+                    get: { viewModel.quickPresetConfiguration(for: preset).cryModeEnabled },
+                    set: { viewModel.updateQuickPreset(preset, cryModeEnabled: $0) }
+                ))
+                .tint(DreamNestTheme.accent)
+                .font(.footnote)
+
+                Button("Done") {
+                    selectedPresetForQuickControls = nil
+                    suppressNextPresetTap = nil
                 }
                 .font(.headline.weight(.semibold))
                 .frame(maxWidth: .infinity)
