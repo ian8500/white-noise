@@ -35,6 +35,7 @@ final class HomeViewModel: ObservableObject {
     private let store: SettingsStoring
     private let cryService: CryDetectionControlling
     private let systemVolume: SystemVolumeControlling
+    private let playbackSessionStore: PlaybackSessionStoring
     private let safetyPolicy: NoiseSafetyPolicy
     private let cryResponseCoordinator: CryResponseCoordinator
     private let dateProvider: () -> Date
@@ -51,6 +52,7 @@ final class HomeViewModel: ObservableObject {
         store: SettingsStoring,
         cryService: CryDetectionControlling,
         systemVolume: SystemVolumeControlling? = nil,
+        playbackSessionStore: PlaybackSessionStoring,
         safetyPolicy: NoiseSafetyPolicy,
         cryResponseCoordinator: CryResponseCoordinator,
         dateProvider: @escaping () -> Date = Date.init
@@ -61,6 +63,7 @@ final class HomeViewModel: ObservableObject {
         self.store = store
         self.cryService = cryService
         self.systemVolume = systemVolume ?? NoOpSystemVolumeController()
+        self.playbackSessionStore = playbackSessionStore
         self.safetyPolicy = safetyPolicy
         self.cryResponseCoordinator = cryResponseCoordinator
         self.dateProvider = dateProvider
@@ -86,6 +89,7 @@ final class HomeViewModel: ObservableObject {
         bind()
         cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
         cryService.updateCooldown(settings.cryResponse.cooldown)
+        restorePlaybackSessionIfNeeded()
         startCryMonitoringIfNeeded()
         refreshCooldownState()
     }
@@ -105,6 +109,22 @@ final class HomeViewModel: ObservableObject {
             return
         }
         startRoutine(preset: preset)
+    }
+
+    func startPreset(_ preset: PlaybackPreset) async {
+        switch preset {
+        case .nap:
+            applyTimerPreset(minutes: 30)
+            toggleCryMode(true)
+        case .bedtime:
+            applyTimerPreset(minutes: 8 * 60)
+            toggleCryMode(cryModeEnabled)
+        }
+        await startPlayback(
+            sound: selectedSound,
+            duration: settings.timer.duration,
+            micModeEnabled: settings.cryResponse.enabled
+        )
     }
 
 
@@ -333,7 +353,7 @@ final class HomeViewModel: ObservableObject {
                 wasTimerRunning = state.isRunning
 
                 if didTimerComplete {
-                    let generation = advancePlaybackGeneration()
+                    _ = advancePlaybackGeneration()
                     isPlaying = false
                     playbackSessionStore.clear()
                     Task { await self.audio.stop(fadeDuration: 0.3) }
@@ -513,6 +533,13 @@ final class HomeViewModel: ObservableObject {
 
         selectedSound = sound
         volume = safetyPolicy.clamped(volume: snapshot.targetVolume)
+        startPlaybackSession(
+            sound: sound,
+            micModeEnabled: snapshot.micModeEnabled,
+            duration: snapshot.remainingDuration,
+            failurePrefix: "Couldn't restore previous playback session"
+        )
+    }
 
     private func startPlaybackSession(
         sound: SoundDefinition,
@@ -525,17 +552,22 @@ final class HomeViewModel: ObservableObject {
         playbackTask = Task { [weak self] in
             guard let self else { return }
             do {
-                try audio.configureSession(micModeEnabled: snapshot.micModeEnabled)
+                try audio.configureSession(micModeEnabled: micModeEnabled)
                 try await audio.play(sound: sound, volume: volume)
-                timer.start(duration: snapshot.remainingDuration, fadeDuration: settings.timer.fadeDuration)
+                timer.start(duration: duration, fadeDuration: settings.timer.fadeDuration)
                 isPlaying = true
+                persistPlaybackSnapshotIfNeeded()
             } catch {
                 guard !Task.isCancelled, generation == playbackGeneration else { return }
                 isPlaying = false
-                warningBanner = "Cry detected, but audio couldn’t start. Check output route and try again. Error: \(error.localizedDescription)"
-                lastCryActionSummary = "Cry detected but playback start failed"
+                warningBanner = "\(failurePrefix): \(error.localizedDescription)"
             }
         }
+    }
+
+    private func advancePlaybackGeneration() -> Int {
+        playbackGeneration += 1
+        return playbackGeneration
     }
 
     private func refreshCooldownState() {
@@ -577,6 +609,7 @@ private extension CryDetectionEvent.Action {
     }
 }
 
+@MainActor
 private final class NoOpSystemVolumeController: SystemVolumeControlling {
     var volumePublisher: AnyPublisher<Float, Never> { Empty().eraseToAnyPublisher() }
     var currentVolume: Float { 0.35 }
