@@ -2,6 +2,9 @@ import AVFoundation
 import Combine
 import Foundation
 import MediaPlayer
+import OSLog
+
+private let audioLogger = Logger(subsystem: "com.dreamnest.app", category: "Audio")
 
 public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
     private static let supportedAudioExtensions: Set<String> = ["mp3", "wav", "m4a", "aac", "aif", "aiff", "caf"]
@@ -28,14 +31,14 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         let options: AVAudioSession.CategoryOptions = micModeEnabled ? [.defaultToSpeaker, .allowBluetooth] : []
         let mode: AVAudioSession.Mode = .default
 
-        print("[Audio] ℹ️ Preparing AVAudioSession configuration. micModeEnabled=\(micModeEnabled)")
-        print("[Audio] ℹ️ Session pre-state. category=\(session.category.rawValue), mode=\(session.mode.rawValue), options=\(describe(options: session.categoryOptions)), route=\(describe(route: session.currentRoute))")
+        audioLogger.info("Preparing AVAudioSession configuration. micModeEnabled=\(micModeEnabled, privacy: .public)")
+        audioLogger.debug("Session pre-state. category=\(session.category.rawValue, privacy: .public), mode=\(session.mode.rawValue, privacy: .public), options=\(self.describe(options: session.categoryOptions), privacy: .public), route=\(self.describe(route: session.currentRoute), privacy: .public)")
         do {
             try session.setCategory(category, mode: mode, options: options)
             try session.setActive(true)
-            print("[Audio] ✅ Session configured. category=\(session.category.rawValue), mode=\(session.mode.rawValue), options=\(describe(options: session.categoryOptions)), route=\(describe(route: session.currentRoute)), micModeEnabled=\(micModeEnabled)")
+            audioLogger.info("Session configured. category=\(session.category.rawValue, privacy: .public), mode=\(session.mode.rawValue, privacy: .public), options=\(self.describe(options: session.categoryOptions), privacy: .public), route=\(self.describe(route: session.currentRoute), privacy: .public), micModeEnabled=\(micModeEnabled, privacy: .public)")
         } catch {
-            print("[Audio] ❌ Session configuration failed. category=\(category.rawValue), mode=\(mode.rawValue), options=\(describe(options: options)), micModeEnabled=\(micModeEnabled), error=\(error.localizedDescription)")
+            audioLogger.error("Session configuration failed. category=\(category.rawValue, privacy: .public), mode=\(mode.rawValue, privacy: .public), options=\(self.describe(options: options), privacy: .public), micModeEnabled=\(micModeEnabled, privacy: .public), error=\(error.localizedDescription, privacy: .public)")
             throw error
         }
     }
@@ -46,16 +49,16 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
 
         guard let url else {
             let message = "Missing bundled audio asset for '\(sound.filename)'. Ensure the file exists in Resources/Audio and is included in target membership."
-            print("[Audio] ❌ \(message)")
+            audioLogger.error("\(message, privacy: .public)")
             state.send(.failed(message: message))
             throw NSError(domain: "DreamNest.Audio", code: 404, userInfo: [NSLocalizedDescriptionKey: message])
         }
 
-        print("[Audio] ✅ Resolved file URL: \(url.path)")
+        audioLogger.info("Resolved file URL: \(url.path, privacy: .private)")
         let ext = url.pathExtension.lowercased()
         guard Self.supportedAudioExtensions.contains(ext) else {
             let message = "Unsupported audio format '\(ext)' for '\(url.lastPathComponent)'. Supported formats: \(Self.supportedAudioExtensions.sorted().joined(separator: ", "))."
-            print("[Audio] ❌ \(message)")
+            audioLogger.error("\(message, privacy: .public)")
             state.send(.failed(message: message))
             throw NSError(domain: "DreamNest.Audio", code: 415, userInfo: [NSLocalizedDescriptionKey: message])
         }
@@ -64,12 +67,12 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         do {
             newPlayer = try AVAudioPlayer(contentsOf: url)
         } catch {
-            print("[Audio] ❌ AVAudioPlayer initialization failed: \(error.localizedDescription)")
+            audioLogger.error("AVAudioPlayer initialization failed: \(error.localizedDescription, privacy: .public)")
             state.send(.failed(message: "Player initialization failed: \(error.localizedDescription)"))
             throw error
         }
 
-        print("[Audio] ✅ AVAudioPlayer initialized for '\(sound.title)'")
+        audioLogger.info("AVAudioPlayer initialized for \(sound.title, privacy: .public)")
 
         newPlayer.numberOfLoops = -1
         newPlayer.volume = 0
@@ -77,7 +80,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
 
         guard newPlayer.play() else {
             let message = "AVAudioPlayer.play() returned false for file: \(url.lastPathComponent)"
-            print("[Audio] ❌ \(message)")
+            audioLogger.error("\(message, privacy: .public)")
             state.send(.failed(message: message))
             throw NSError(domain: "DreamNest.Audio", code: 500, userInfo: [NSLocalizedDescriptionKey: message])
         }
@@ -87,7 +90,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         nowPlayingSound = sound
         state.send(.playing(soundID: sound.id))
         updateNowPlaying(sound: sound, isPlaying: true)
-        print("[Audio] ✅ Playback started for '\(sound.title)' with looping enabled")
+        audioLogger.info("Playback started for \(sound.title, privacy: .public) with looping enabled")
 
         await crossfade(from: oldPlayer, to: newPlayer, targetVolume: max(0, min(volume, 1)))
     }
@@ -110,13 +113,13 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         player?.pause()
         state.send(.idle)
         updateNowPlayingPlaybackState(isPlaying: false)
-        print("[Audio] ℹ️ Playback paused")
+        audioLogger.info("Playback paused")
     }
 
     public func resume() {
         guard let player else { return }
         guard player.play() else {
-            print("[Audio] ❌ Resume failed: AVAudioPlayer.play() returned false")
+            audioLogger.error("Resume failed: AVAudioPlayer.play() returned false")
             return
         }
 
@@ -124,7 +127,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
             state.send(.playing(soundID: id))
         }
         updateNowPlayingPlaybackState(isPlaying: true)
-        print("[Audio] ✅ Playback resumed")
+        audioLogger.info("Playback resumed")
     }
 
     public func stop(fadeDuration: TimeInterval) async {
@@ -140,7 +143,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
         self.player = nil
         state.send(.idle)
         updateNowPlayingPlaybackState(isPlaying: false)
-        print("[Audio] ✅ Playback stopped")
+        audioLogger.info("Playback stopped")
     }
 
     private func resolveBundledSoundURL(filename: String) -> URL? {
@@ -163,7 +166,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
             }
         }
 
-        print("[Audio] ❌ Could not resolve bundled file for '\(filename)'. Tried extensions=\(candidateExts), subdirectories=\(subdirectories.map { $0 ?? "<root>" })")
+        audioLogger.error("Could not resolve bundled file for \(filename, privacy: .public). Tried extensions=\(candidateExts.description, privacy: .public), subdirectories=\(subdirectories.map { $0 ?? "<root>" }.description, privacy: .public)")
         return nil
     }
 
