@@ -128,6 +128,7 @@ private final class StoreStub: SettingsStoring {
     func save(_ settings: AppSettings) { self.settings = settings }
     func appendCryEvent(_ event: CryDetectionEvent) {}
     func loadCryEvents(limit: Int) -> [CryDetectionEvent] { [] }
+    func clearCryEvents() {}
 }
 
 private final class CryStub: CryDetectionControlling {

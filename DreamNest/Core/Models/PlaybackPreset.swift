@@ -17,4 +17,13 @@ public enum PlaybackPreset: String, Codable, CaseIterable, Sendable {
         case .bedtime: 8 * 60 * 60
         }
     }
+
+    public var defaultCryModeEnabled: Bool {
+        switch self {
+        case .nap:
+            return true
+        case .bedtime:
+            return false
+        }
+    }
 }

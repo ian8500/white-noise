@@ -112,19 +112,37 @@ final class HomeViewModel: ObservableObject {
     }
 
     func startPreset(_ preset: PlaybackPreset) async {
-        switch preset {
-        case .nap:
-            applyTimerPreset(minutes: 30)
-            toggleCryMode(true)
-        case .bedtime:
-            applyTimerPreset(minutes: 8 * 60)
-            toggleCryMode(cryModeEnabled)
-        }
+        let config = quickPresetConfiguration(for: preset)
+        settings.timer.duration = config.duration
+        toggleCryMode(config.cryModeEnabled)
+        store.save(settings)
         await startPlayback(
             sound: selectedSound,
             duration: settings.timer.duration,
             micModeEnabled: settings.cryResponse.enabled
         )
+    }
+
+    func quickPresetConfiguration(for preset: PlaybackPreset) -> QuickStartPresetSettings {
+        settings.quickStartPresets[preset.rawValue] ?? .default(for: preset)
+    }
+
+    func updateQuickPreset(_ preset: PlaybackPreset, durationMinutes: Int? = nil, cryModeEnabled: Bool? = nil) {
+        var config = quickPresetConfiguration(for: preset)
+        if let durationMinutes {
+            config.duration = TimeInterval(max(1, durationMinutes) * 60)
+        }
+        if let cryModeEnabled {
+            config.cryModeEnabled = cryModeEnabled
+        }
+        settings.quickStartPresets[preset.rawValue] = config
+        store.save(settings)
+    }
+
+    func clearCryEvents() {
+        store.clearCryEvents()
+        recentCryEvents = []
+        lastCryActionSummary = "No cry events yet"
     }
 
 

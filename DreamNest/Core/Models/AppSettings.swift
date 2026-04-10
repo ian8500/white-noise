@@ -64,6 +64,20 @@ public struct PremiumState: Codable, Equatable, Sendable {
     }
 }
 
+public struct QuickStartPresetSettings: Codable, Equatable, Sendable {
+    public var duration: TimeInterval
+    public var cryModeEnabled: Bool
+
+    public init(duration: TimeInterval, cryModeEnabled: Bool) {
+        self.duration = max(60, duration)
+        self.cryModeEnabled = cryModeEnabled
+    }
+
+    public static func `default`(for preset: PlaybackPreset) -> QuickStartPresetSettings {
+        .init(duration: preset.defaultDuration, cryModeEnabled: preset.defaultCryModeEnabled)
+    }
+}
+
 public struct RoutinePreset: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public var name: String
@@ -108,6 +122,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var noiseProtection: NoiseProtectionSettings
     public var routinePresets: [RoutinePreset]
     public var defaultRoutinePresetID: UUID?
+    public var quickStartPresets: [String: QuickStartPresetSettings]
 
     public init(
         lastSoundID: String = "white-noise",
@@ -119,7 +134,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         premium: PremiumState = .init(),
         noiseProtection: NoiseProtectionSettings = .init(),
         routinePresets: [RoutinePreset] = [],
-        defaultRoutinePresetID: UUID? = nil
+        defaultRoutinePresetID: UUID? = nil,
+        quickStartPresets: [String: QuickStartPresetSettings] = [:]
     ) {
         self.lastSoundID = lastSoundID
         self.lastVolume = lastVolume
@@ -131,6 +147,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.noiseProtection = noiseProtection
         self.routinePresets = routinePresets
         self.defaultRoutinePresetID = defaultRoutinePresetID
+        self.quickStartPresets = quickStartPresets
     }
 
     enum CodingKeys: String, CodingKey {
@@ -144,6 +161,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case noiseProtection
         case routinePresets
         case defaultRoutinePresetID
+        case quickStartPresets
         case maxGainCap
     }
 
@@ -166,6 +184,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
         routinePresets = try container.decodeIfPresent([RoutinePreset].self, forKey: .routinePresets) ?? []
         defaultRoutinePresetID = try container.decodeIfPresent(UUID.self, forKey: .defaultRoutinePresetID)
+        quickStartPresets = try container.decodeIfPresent([String: QuickStartPresetSettings].self, forKey: .quickStartPresets) ?? [:]
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -180,6 +199,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try container.encode(noiseProtection, forKey: .noiseProtection)
         try container.encode(routinePresets, forKey: .routinePresets)
         try container.encodeIfPresent(defaultRoutinePresetID, forKey: .defaultRoutinePresetID)
+        try container.encode(quickStartPresets, forKey: .quickStartPresets)
     }
 }
 

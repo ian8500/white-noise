@@ -40,4 +40,8 @@ public final class UserDefaultsSettingsStore: SettingsStoring {
         else { return [] }
         return Array(events.prefix(max(0, limit)))
     }
+
+    public func clearCryEvents() {
+        defaults.removeObject(forKey: Keys.cryEvents)
+    }
 }

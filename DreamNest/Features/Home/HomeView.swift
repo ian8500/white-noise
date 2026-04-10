@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var isTimerExpanded = true
     @State private var isVolumeExpanded = true
     @State private var isSoundExpanded = true
+    @State private var isPresetConfigExpanded = false
     @State private var isCryModeExpanded = false
 
     var body: some View {
@@ -21,6 +22,9 @@ struct HomeView: View {
                     timerHeroCard
                     quickStartButton
                     presetButtons
+                    ExpandableSettingsCard(title: "Nap & Bedtime Presets", isExpanded: $isPresetConfigExpanded) {
+                        presetConfigCardContent
+                    }
                     stopButton
                     ExpandableSettingsCard(title: "Sleep Timer Controls", isExpanded: $isTimerExpanded) {
                         timerCardContent
@@ -121,19 +125,89 @@ struct HomeView: View {
 
 
     private var presetButtons: some View {
-        HStack(spacing: 8) {
-            Button("Start Nap") {
-                Task { await viewModel.startPreset(PlaybackPreset.nap) }
-            }
-            .buttonStyle(.bordered)
-
-            Button("Start Bedtime") {
-                Task { await viewModel.startPreset(PlaybackPreset.bedtime) }
-            }
-            .buttonStyle(.borderedProminent)
+        HStack(spacing: 10) {
+            quickPresetButton(for: .nap, prominent: false)
+            quickPresetButton(for: .bedtime, prominent: true)
         }
         .tint(DreamNestTheme.accent)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func quickPresetButton(for preset: PlaybackPreset, prominent: Bool) -> some View {
+        let config = viewModel.quickPresetConfiguration(for: preset)
+        return Button {
+            Task { await viewModel.startPreset(preset) }
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Start \(preset.title)")
+                    .font(.subheadline.weight(.semibold))
+                Text("\(Int(config.duration / 60))m • Cry \(config.cryModeEnabled ? "On" : "Off")")
+                    .font(.caption)
+                    .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.82) : DreamNestTheme.secondaryText)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(prominent ? .borderedProminent : .bordered)
+    }
+
+    private var presetConfigCardContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Tune your Quick Start buttons with preferred durations and cry response behavior.")
+                .font(.footnote)
+                .foregroundStyle(DreamNestTheme.secondaryText)
+            presetConfigRow(for: .nap)
+            presetConfigRow(for: .bedtime)
+        }
+    }
+
+    private func presetConfigRow(for preset: PlaybackPreset) -> some View {
+        let config = viewModel.quickPresetConfiguration(for: preset)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(preset.title)
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("\(Int(config.duration / 60)) minutes")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(DreamNestTheme.secondaryText)
+            }
+            HStack(spacing: 8) {
+                timerStepButton(title: "-5m") {
+                    let updated = max(1, Int(config.duration / 60) - 5)
+                    viewModel.updateQuickPreset(preset, durationMinutes: updated)
+                }
+                timerStepButton(title: "-1m") {
+                    let updated = max(1, Int(config.duration / 60) - 1)
+                    viewModel.updateQuickPreset(preset, durationMinutes: updated)
+                }
+                timerStepButton(title: "+1m") {
+                    viewModel.updateQuickPreset(preset, durationMinutes: Int(config.duration / 60) + 1)
+                }
+                timerStepButton(title: "+5m") {
+                    viewModel.updateQuickPreset(preset, durationMinutes: Int(config.duration / 60) + 5)
+                }
+            }
+            Toggle("Enable cry response", isOn: Binding(
+                get: { viewModel.quickPresetConfiguration(for: preset).cryModeEnabled },
+                set: { viewModel.updateQuickPreset(preset, cryModeEnabled: $0) }
+            ))
+            .tint(DreamNestTheme.accent)
+            .font(.footnote)
+        }
+        .padding(12)
+        .background(DreamNestTheme.cardBackground.opacity(0.65))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func timerStepButton(title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(DreamNestTheme.background.opacity(0.8))
+            .clipShape(Capsule())
+            .foregroundStyle(DreamNestTheme.primaryText)
     }
 
     private var stopButton: some View {
@@ -261,6 +335,19 @@ struct HomeView: View {
 
     private var cryEventLogCardContent: some View {
         VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Last detections and actions")
+                    .font(.footnote)
+                    .foregroundStyle(DreamNestTheme.secondaryText)
+                Spacer()
+                if !viewModel.recentCryEvents.isEmpty {
+                    Button("Clear") {
+                        viewModel.clearCryEvents()
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.red.opacity(0.9))
+                }
+            }
             if viewModel.recentCryEvents.isEmpty {
                 Text("Cry responses will appear here with confidence and actions.")
                     .foregroundStyle(DreamNestTheme.secondaryText)
@@ -417,4 +504,5 @@ private final class PreviewSettingsStore: SettingsStoring {
     func save(_ settings: AppSettings) { self.settings = settings }
     func appendCryEvent(_ event: CryDetectionEvent) {}
     func loadCryEvents(limit: Int) -> [CryDetectionEvent] { Array(PreviewData.sampleCryEvents.suffix(limit)) }
+    func clearCryEvents() {}
 }
