@@ -12,6 +12,7 @@ public protocol AudioPlaybackControlling: AnyObject {
     func stop(fadeDuration: TimeInterval) async
 }
 
+@MainActor
 public protocol SystemVolumeControlling: AnyObject {
     var volumePublisher: AnyPublisher<Float, Never> { get }
     var currentVolume: Float { get }
