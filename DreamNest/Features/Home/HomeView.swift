@@ -135,7 +135,7 @@ struct HomeView: View {
 
     private func quickPresetButton(for preset: PlaybackPreset, prominent: Bool) -> some View {
         let config = viewModel.quickPresetConfiguration(for: preset)
-        return Button {
+        let button = Button {
             Task { await viewModel.startPreset(preset) }
         } label: {
             VStack(alignment: .leading, spacing: 4) {
@@ -148,7 +148,12 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 8)
         }
-        .buttonStyle(prominent ? .borderedProminent : .bordered)
+
+        if prominent {
+            button.buttonStyle(BorderedProminentButtonStyle())
+        } else {
+            button.buttonStyle(BorderedButtonStyle())
+        }
     }
 
     private var presetConfigCardContent: some View {
