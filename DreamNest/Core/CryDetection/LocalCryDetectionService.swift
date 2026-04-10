@@ -2,8 +2,10 @@ import AVFoundation
 import Combine
 import Foundation
 import Accelerate
+import OSLog
 
 public final class LocalCryDetectionService: CryDetectionControlling {
+    private let logger = Logger(subsystem: "com.dreamnest.app", category: "CryDetection")
     private let engine = AVAudioEngine()
     private let stateMachine: CryDetectionStateMachine
     private let subject = PassthroughSubject<CryDetectionSignal, Never>()
@@ -26,11 +28,35 @@ public final class LocalCryDetectionService: CryDetectionControlling {
     public func start() throws {
         guard !isRunning else { return }
         let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
+        let inputFormat = input.inputFormat(forBus: 0)
+        let outputFormat = input.outputFormat(forBus: 0)
+        let sampleRate = outputFormat.sampleRate > 0 ? outputFormat.sampleRate : inputFormat.sampleRate
 
-        input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
+        guard sampleRate > 0 else {
+            throw NSError(
+                domain: "DreamNest.CryDetection",
+                code: 1001,
+                userInfo: [NSLocalizedDescriptionKey: "Microphone is unavailable right now. Try reconnecting audio devices and starting cry detection again."]
+            )
+        }
+
+        if outputFormat.channelCount == 0 {
+            throw NSError(
+                domain: "DreamNest.CryDetection",
+                code: 1002,
+                userInfo: [NSLocalizedDescriptionKey: "No microphone input channels were detected."]
+            )
+        }
+
+        logger.info("Starting cry detection. input=\(inputFormat.description, privacy: .public), output=\(outputFormat.description, privacy: .public)")
+
+        input.removeTap(onBus: 0)
+        engine.stop()
+        engine.reset()
+
+        input.installTap(onBus: 0, bufferSize: 2048, format: nil) { [weak self] buffer, _ in
             guard let self,
-                  let frame = self.extractFeatures(from: buffer, sampleRate: Float(format.sampleRate))
+                  let frame = self.extractFeatures(from: buffer, sampleRate: Float(sampleRate))
             else { return }
 
             let signal = self.stateMachine.process(frame)
@@ -46,6 +72,7 @@ public final class LocalCryDetectionService: CryDetectionControlling {
         guard isRunning else { return }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
+        engine.reset()
         isRunning = false
     }
 
