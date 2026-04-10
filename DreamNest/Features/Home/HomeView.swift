@@ -4,10 +4,9 @@ import Combine
 struct HomeView: View {
     @StateObject var viewModel: HomeViewModel
     @State private var isVolumeExpanded = true
-    @State private var isSoundExpanded = true
     @State private var isPresetConfigExpanded = false
     @State private var isCryEventsExpanded = true
-    @State private var showSleepTimerDialog = false
+    @State private var showStartRoutineDialog = false
 
     var body: some View {
         ZStack {
@@ -22,9 +21,6 @@ struct HomeView: View {
                     ExpandableSettingsCard(title: "Volume", isExpanded: $isVolumeExpanded) {
                         volumeCardContent
                     }
-                    ExpandableSettingsCard(title: "Sound", isExpanded: $isSoundExpanded) {
-                        soundPickerContent
-                    }
                     ExpandableSettingsCard(title: "Nap & Bedtime Presets", isExpanded: $isPresetConfigExpanded) {
                         presetConfigCardContent
                     }
@@ -35,26 +31,20 @@ struct HomeView: View {
                 .padding()
             }
         }
+        .overlay {
+            if showStartRoutineDialog {
+                startRoutineDialogOverlay
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    .zIndex(2)
+            }
+        }
         .preferredColorScheme(.dark)
         .alert("Safety Guidance", isPresented: .constant(viewModel.warningBanner != nil), actions: {
             Button("OK") { viewModel.warningBanner = nil }
         }, message: {
             Text(viewModel.warningBanner ?? "")
         })
-        .confirmationDialog("Sleep Timer Controls", isPresented: $showSleepTimerDialog, titleVisibility: .visible) {
-            Button("Set to 60 minutes") { viewModel.applyTimerPreset(minutes: 60) }
-            Button("Set to 30 minutes") { viewModel.applyTimerPreset(minutes: 30) }
-            Button("Set to 15 minutes") { viewModel.applyTimerPreset(minutes: 15) }
-            Button("Decrease by 10 minutes") { viewModel.adjustTimerDuration(minutesDelta: -10) }
-            Button("Decrease by 5 minutes") { viewModel.adjustTimerDuration(minutesDelta: -5) }
-            Button("Decrease by 1 minute") { viewModel.adjustTimerDuration(minutesDelta: -1) }
-            Button("Increase by 10 minutes") { viewModel.adjustTimerDuration(minutesDelta: 10) }
-            Button("Increase by 5 minutes") { viewModel.adjustTimerDuration(minutesDelta: 5) }
-            Button("Increase by 1 minute") { viewModel.adjustTimerDuration(minutesDelta: 1) }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Long press Start Routine to quickly adjust your sleep timer.")
-        }
+        .animation(.easeInOut(duration: 0.2), value: showStartRoutineDialog)
     }
 
     private var header: some View {
@@ -100,10 +90,10 @@ struct HomeView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onTapGesture(perform: viewModel.startDefaultRoutine)
         .onLongPressGesture(minimumDuration: 0.5) {
-            showSleepTimerDialog = true
+            showStartRoutineDialog = true
         }
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Starts your default routine preset, or current settings if no default is set.")
+        .accessibilityHint("Starts your configured routine. Long press to adjust timer and sound.")
     }
 
     private var timerHeroCard: some View {
@@ -321,34 +311,107 @@ struct HomeView: View {
         .accessibilityValue("\(Int(viewModel.volume * 100)) percent")
     }
 
-    private var soundPickerContent: some View {
-        ForEach(viewModel.catalog) { sound in
-            Button {
-                viewModel.selectSound(sound)
-            } label: {
+    private var startRoutineDialogOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .onTapGesture { showStartRoutineDialog = false }
+
+            VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text(sound.title)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Start Routine Controls")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(DreamNestTheme.primaryText)
+                        Text("Set timer and sound before you start.")
+                            .font(.footnote)
+                            .foregroundStyle(DreamNestTheme.secondaryText)
+                    }
                     Spacer()
                     Button {
-                        viewModel.toggleFavorite(sound)
+                        showStartRoutineDialog = false
                     } label: {
-                        Image(systemName: viewModel.isFavorite(sound) ? "star.fill" : "star")
-                            .foregroundStyle(DreamNestTheme.accent)
+                        Image(systemName: "xmark")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(DreamNestTheme.primaryText)
+                            .padding(8)
+                            .background(DreamNestTheme.background.opacity(0.85))
+                            .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(viewModel.isFavorite(sound) ? "Remove favorite" : "Add favorite")
-
-                    if viewModel.selectedSound.id == sound.id {
-                        Image(systemName: "checkmark.circle.fill")
-                    }
                 }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Sleep Timer")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(DreamNestTheme.secondaryText)
+                    HStack(spacing: 8) {
+                        timerStepButton(title: "-10m") { viewModel.adjustTimerDuration(minutesDelta: -10) }
+                        timerStepButton(title: "-5m") { viewModel.adjustTimerDuration(minutesDelta: -5) }
+                        timerStepButton(title: "-1m") { viewModel.adjustTimerDuration(minutesDelta: -1) }
+                        Spacer(minLength: 4)
+                        timerStepButton(title: "+1m") { viewModel.adjustTimerDuration(minutesDelta: 1) }
+                        timerStepButton(title: "+5m") { viewModel.adjustTimerDuration(minutesDelta: 5) }
+                        timerStepButton(title: "+10m") { viewModel.adjustTimerDuration(minutesDelta: 10) }
+                    }
+                    Text("Current timer: \(viewModel.formattedTimerDuration)")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(DreamNestTheme.primaryText)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Sound")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(DreamNestTheme.secondaryText)
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            ForEach(viewModel.catalog) { sound in
+                                Button {
+                                    viewModel.selectSound(sound)
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Text(sound.title)
+                                            .lineLimit(1)
+                                        Spacer()
+                                        if viewModel.selectedSound.id == sound.id {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundStyle(DreamNestTheme.accent)
+                                        }
+                                    }
+                                    .foregroundStyle(DreamNestTheme.primaryText)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(DreamNestTheme.background.opacity(0.85))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 240)
+                }
+
+                Button("Done") {
+                    showStartRoutineDialog = false
+                }
+                .font(.headline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(DreamNestTheme.accent)
                 .foregroundStyle(DreamNestTheme.primaryText)
-                .padding(10)
-                .background(DreamNestTheme.cardBackground.opacity(0.8))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .buttonStyle(.plain)
-            .accessibilityHint("Select \(sound.title) sound.")
+            .padding(16)
+            .frame(maxWidth: 420)
+            .background(DreamNestTheme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(DreamNestTheme.secondaryText.opacity(0.2), lineWidth: 1)
+            )
+            .padding(.horizontal, 16)
+            .accessibilityAddTraits(.isModal)
         }
     }
 

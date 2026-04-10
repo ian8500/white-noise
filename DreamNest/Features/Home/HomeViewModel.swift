@@ -104,11 +104,7 @@ final class HomeViewModel: ObservableObject {
     }
 
     func startDefaultRoutine() {
-        guard let preset = defaultRoutinePreset else {
-            quickStart()
-            return
-        }
-        startRoutine(preset: preset)
+        quickStart()
     }
 
     func startPreset(_ preset: PlaybackPreset) async {
