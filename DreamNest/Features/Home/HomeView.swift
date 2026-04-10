@@ -3,7 +3,13 @@ import Combine
 
 struct HomeView: View {
     @StateObject var viewModel: HomeViewModel
-    @State private var presetDraftName = ""
+    @State private var isCryStatusExpanded = false
+    @State private var isCryEventsExpanded = false
+    @State private var isRecentExpanded = false
+    @State private var isTimerExpanded = true
+    @State private var isVolumeExpanded = true
+    @State private var isSoundExpanded = true
+    @State private var isCryModeExpanded = false
 
     var body: some View {
         ZStack {
@@ -15,13 +21,27 @@ struct HomeView: View {
                     quickStartButton
                     presetButtons
                     stopButton
-                    cryStatusCard
-                    cryEventLogCard
-                    recentSoundsCard
-                    timerCard
-                    volumeCard
-                    soundPicker
-                    cryModeCard
+                    ExpandableSettingsCard(title: "Sleep Timer", isExpanded: $isTimerExpanded) {
+                        timerCardContent
+                    }
+                    ExpandableSettingsCard(title: "Volume", isExpanded: $isVolumeExpanded) {
+                        volumeCardContent
+                    }
+                    ExpandableSettingsCard(title: "Sound", isExpanded: $isSoundExpanded) {
+                        soundPickerContent
+                    }
+                    ExpandableSettingsCard(title: "Recent", isExpanded: $isRecentExpanded) {
+                        recentSoundsCardContent
+                    }
+                    ExpandableSettingsCard(title: "Cry Response Mode", isExpanded: $isCryModeExpanded) {
+                        cryModeCardContent
+                    }
+                    ExpandableSettingsCard(title: "Cry Response Status", isExpanded: $isCryStatusExpanded) {
+                        cryStatusCardContent
+                    }
+                    ExpandableSettingsCard(title: "Recent Cry Events", isExpanded: $isCryEventsExpanded) {
+                        cryEventLogCardContent
+                    }
                 }
                 .padding()
             }
@@ -97,84 +117,8 @@ struct HomeView: View {
         .accessibilityHint("Stops audio playback and cancels the active timer.")
     }
 
-    private var routinesCard: some View {
-        SettingsCard(title: "Premium Routines") {
-            VStack(alignment: .leading, spacing: 10) {
-                if let defaultPreset = viewModel.defaultRoutinePreset {
-                    Text("Default quick start: \(defaultPreset.name)")
-                        .font(.footnote)
-                        .foregroundStyle(DreamNestTheme.secondaryText)
-                }
-
-                ForEach(Array(viewModel.routinePresets.enumerated()), id: \.element.id) { index, preset in
-                    HStack(spacing: 10) {
-                        Button {
-                            viewModel.startRoutine(preset: preset)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(preset.name)
-                                    .font(.subheadline.weight(.semibold))
-                                Text("\(Int(preset.timerDuration / 60))m • \(preset.cryModeEnabled ? "Cry Mode On" : "Cry Mode Off")")
-                                    .font(.caption)
-                                    .foregroundStyle(DreamNestTheme.secondaryText)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            viewModel.renamePreset(id: preset.id, name: "\(preset.name) \(index + 1)")
-                        } label: {
-                            Image(systemName: "pencil")
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            viewModel.setDefaultPreset(id: preset.id)
-                        } label: {
-                            Image(systemName: viewModel.defaultRoutinePresetID == preset.id ? "bolt.fill" : "bolt")
-                                .foregroundStyle(DreamNestTheme.accent)
-                        }
-                        .buttonStyle(.plain)
-
-                        VStack(spacing: 4) {
-                            Button {
-                                guard index > 0 else { return }
-                                viewModel.movePresets(from: IndexSet(integer: index), to: index - 1)
-                            } label: {
-                                Image(systemName: "chevron.up")
-                            }
-                            .buttonStyle(.plain)
-
-                            Button {
-                                guard index < viewModel.routinePresets.count - 1 else { return }
-                                viewModel.movePresets(from: IndexSet(integer: index), to: index + 2)
-                            } label: {
-                                Image(systemName: "chevron.down")
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .foregroundStyle(DreamNestTheme.primaryText)
-                    .padding(10)
-                    .background(DreamNestTheme.cardBackground.opacity(0.8))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-
-                HStack {
-                    TextField("New preset name", text: $presetDraftName)
-                        .textFieldStyle(.roundedBorder)
-                    Button("Save") {
-                        viewModel.saveCurrentAsPreset(named: presetDraftName)
-                        presetDraftName = ""
-                    }
-                }
-            }
-        }
-    }
-
-    private var timerCard: some View {
-        SettingsCard(title: "Sleep Timer") {
+    private var timerCardContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(viewModel.timerCountdownTitle)
                     .font(.subheadline.weight(.semibold))
@@ -213,55 +157,51 @@ struct HomeView: View {
             .accessibilityLabel("\(minutesDelta >= 0 ? "Increase" : "Decrease") timer by \(abs(minutesDelta)) minutes")
     }
 
-    private var volumeCard: some View {
-        SettingsCard(title: "Volume") {
-            Slider(value: Binding(
-                get: { Double(viewModel.volume) },
-                set: { viewModel.setVolume(Float($0)) }
-            ), in: 0 ... 1)
-            .accessibilityLabel("Playback volume")
-            .accessibilityValue("\(Int(viewModel.volume * 100)) percent")
-        }
+    private var volumeCardContent: some View {
+        Slider(value: Binding(
+            get: { Double(viewModel.volume) },
+            set: { viewModel.setVolume(Float($0)) }
+        ), in: 0 ... 1)
+        .accessibilityLabel("Playback volume")
+        .accessibilityValue("\(Int(viewModel.volume * 100)) percent")
     }
 
-    private var soundPicker: some View {
-        SettingsCard(title: "Sound") {
-            ForEach(viewModel.catalog) { sound in
-                Button {
-                    viewModel.selectSound(sound)
-                } label: {
-                    HStack {
-                        Text(sound.title)
-                        Spacer()
-                        Button {
-                            viewModel.toggleFavorite(sound)
-                        } label: {
-                            Image(systemName: viewModel.isFavorite(sound) ? "star.fill" : "star")
-                                .foregroundStyle(DreamNestTheme.accent)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(viewModel.isFavorite(sound) ? "Remove favorite" : "Add favorite")
-
-                        if viewModel.selectedSound.id == sound.id {
-                            Image(systemName: "checkmark.circle.fill")
-                        }
+    private var soundPickerContent: some View {
+        ForEach(viewModel.catalog) { sound in
+            Button {
+                viewModel.selectSound(sound)
+            } label: {
+                HStack {
+                    Text(sound.title)
+                    Spacer()
+                    Button {
+                        viewModel.toggleFavorite(sound)
+                    } label: {
+                        Image(systemName: viewModel.isFavorite(sound) ? "star.fill" : "star")
+                            .foregroundStyle(DreamNestTheme.accent)
                     }
-                    .foregroundStyle(DreamNestTheme.primaryText)
-                    .padding(10)
-                    .background(DreamNestTheme.cardBackground.opacity(0.8))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(viewModel.isFavorite(sound) ? "Remove favorite" : "Add favorite")
+
+                    if viewModel.selectedSound.id == sound.id {
+                        Image(systemName: "checkmark.circle.fill")
+                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint("Select \(sound.title) sound.")
+                .foregroundStyle(DreamNestTheme.primaryText)
+                .padding(10)
+                .background(DreamNestTheme.cardBackground.opacity(0.8))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
+            .buttonStyle(.plain)
+            .accessibilityHint("Select \(sound.title) sound.")
         }
     }
 
-    private var cryModeCard: some View {
+    private var cryModeCardContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Cry Response Mode")
-                    .foregroundStyle(DreamNestTheme.primaryText)
+                Text("Enable smart soothing response")
+                    .foregroundStyle(DreamNestTheme.secondaryText)
                 Spacer()
                 Toggle("", isOn: Binding(
                     get: { viewModel.cryModeEnabled },
@@ -274,30 +214,20 @@ struct HomeView: View {
                 .foregroundStyle(DreamNestTheme.secondaryText)
                 .font(.footnote)
         }
-        .padding()
-        .background(DreamNestTheme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private var cryStatusCard: some View {
+    private var cryStatusCardContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Cry Response Status")
-                .foregroundStyle(DreamNestTheme.primaryText)
             cryStatusRow(title: "Monitoring", value: viewModel.cryMonitoringStatusLabel)
             cryStatusRow(title: "Last detection", value: formattedDate(viewModel.lastCryDetectionTime))
             cryStatusRow(title: "Last confidence", value: formattedConfidence(viewModel.lastCryConfidence))
             cryStatusRow(title: "Cooldown", value: viewModel.cryCooldownStatusLabel)
             cryStatusRow(title: "Last action", value: viewModel.lastCryActionSummary)
         }
-        .padding()
-        .background(DreamNestTheme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private var cryEventLogCard: some View {
+    private var cryEventLogCardContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Recent Cry Events")
-                .foregroundStyle(DreamNestTheme.primaryText)
             if viewModel.recentCryEvents.isEmpty {
                 Text("Cry responses will appear here with confidence and actions.")
                     .foregroundStyle(DreamNestTheme.secondaryText)
@@ -341,8 +271,8 @@ struct HomeView: View {
         return "\(Int((confidence * 100).rounded()))%"
     }
 
-    private var recentSoundsCard: some View {
-        SettingsCard(title: "Recent") {
+    private var recentSoundsCardContent: some View {
+        Group {
             if viewModel.recentSounds.isEmpty {
                 Text("Your last selected sounds appear here.")
                     .foregroundStyle(DreamNestTheme.secondaryText)
@@ -360,19 +290,44 @@ struct HomeView: View {
     }
 }
 
-private struct SettingsCard<Content: View>: View {
+private struct ExpandableSettingsCard<Content: View>: View {
     let title: String
+    @Binding var isExpanded: Bool
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(.headline)
+                    Spacer()
+                    Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(DreamNestTheme.accent)
+                }
                 .foregroundStyle(DreamNestTheme.primaryText)
-            content
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(title). \(isExpanded ? "Expanded" : "Collapsed")")
+            .accessibilityHint("Double tap to \(isExpanded ? "collapse" : "expand") section.")
+
+            if isExpanded {
+                content
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding()
         .background(DreamNestTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(DreamNestTheme.secondaryText.opacity(0.16), lineWidth: 1)
+        )
     }
 }
 
