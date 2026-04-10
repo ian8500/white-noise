@@ -12,6 +12,12 @@ public protocol AudioPlaybackControlling: AnyObject {
     func stop(fadeDuration: TimeInterval) async
 }
 
+public protocol SystemVolumeControlling: AnyObject {
+    var volumePublisher: AnyPublisher<Float, Never> { get }
+    var currentVolume: Float { get }
+    func setSystemVolume(_ value: Float)
+}
+
 public protocol SoundCatalogProviding {
     var sounds: [SoundDefinition] { get }
     func sound(id: String) -> SoundDefinition?
