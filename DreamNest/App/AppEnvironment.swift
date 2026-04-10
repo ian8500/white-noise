@@ -31,12 +31,12 @@ final class AppEnvironment {
                 )
             ),
             systemVolume: SystemVolumeService(),
+            playbackSessionStore: sessionStore,
             safetyPolicy: NoiseSafetyPolicy(
                 maxGainCap: settings.noiseProtection.maxGainCap,
                 warningThreshold: settings.noiseProtection.warningThreshold
             ),
-            cryResponseCoordinator: CryResponseCoordinator(),
-            playbackSessionStore: sessionStore
+            cryResponseCoordinator: CryResponseCoordinator()
         )
 
         return AppEnvironment(homeViewModel: homeViewModel)
