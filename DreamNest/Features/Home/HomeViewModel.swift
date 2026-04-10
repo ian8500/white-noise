@@ -29,6 +29,7 @@ final class HomeViewModel: ObservableObject {
     private let systemVolume: SystemVolumeControlling
     private let safetyPolicy: NoiseSafetyPolicy
     private let cryResponseCoordinator: CryResponseCoordinator
+    private let playbackSessionStore: PlaybackSessionStoring
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -39,7 +40,8 @@ final class HomeViewModel: ObservableObject {
         cryService: CryDetectionControlling,
         systemVolume: SystemVolumeControlling? = nil,
         safetyPolicy: NoiseSafetyPolicy,
-        cryResponseCoordinator: CryResponseCoordinator
+        cryResponseCoordinator: CryResponseCoordinator,
+        playbackSessionStore: PlaybackSessionStoring
     ) {
         self.catalog = catalogService.sounds
         self.audio = audio
@@ -49,6 +51,7 @@ final class HomeViewModel: ObservableObject {
         self.systemVolume = systemVolume ?? NoOpSystemVolumeController()
         self.safetyPolicy = safetyPolicy
         self.cryResponseCoordinator = cryResponseCoordinator
+        self.playbackSessionStore = playbackSessionStore
 
         settings = store.load()
         selectedSound = catalogService.sound(id: settings.lastSoundID) ?? catalogService.sounds[0]
@@ -62,29 +65,31 @@ final class HomeViewModel: ObservableObject {
         cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
         cryService.updateCooldown(settings.cryResponse.cooldown)
         startCryMonitoringIfNeeded()
+        restorePlaybackSessionIfNeeded()
     }
 
     func quickStart() {
-        Task {
-            do {
-                try audio.configureSession(micModeEnabled: cryModeEnabled)
-                try await audio.play(sound: selectedSound, volume: safetyPolicy.clamped(volume: volume))
-                timer.start(duration: settings.timer.duration, fadeDuration: settings.timer.fadeDuration)
-                isPlaying = true
-            } catch {
-                isPlaying = false
-                warningBanner = "Playback failed: \(error.localizedDescription)"
-                homeLogger.error("quickStart failed: \(error.localizedDescription, privacy: .public)")
-            }
+        Task { await startPlayback(sound: selectedSound, duration: settings.timer.duration, micModeEnabled: cryModeEnabled) }
+    }
+
+    func startPreset(_ preset: PlaybackPreset) async {
+        switch preset {
+        case .nap:
+            await startPlayback(sound: selectedSound, duration: 30 * 60, micModeEnabled: cryModeEnabled)
+        case .bedtime:
+            await startPlayback(sound: selectedSound, duration: 8 * 60 * 60, micModeEnabled: cryModeEnabled)
         }
     }
 
     func stopPlayback() {
+        Task { await stopPlaybackFromAutomation() }
+    }
+
+    func stopPlaybackFromAutomation() async {
         timer.cancel()
-        Task {
-            await audio.stop(fadeDuration: 0.3)
-            isPlaying = false
-        }
+        playbackSessionStore.clear()
+        await audio.stop(fadeDuration: 0.3)
+        isPlaying = false
     }
 
     func setVolume(_ value: Float) {
@@ -97,6 +102,7 @@ final class HomeViewModel: ObservableObject {
         audio.updateVolume(clamped, rampDuration: 0.25)
         settings.lastVolume = clamped
         store.save(settings)
+        persistPlaybackSnapshotIfNeeded()
     }
 
     func selectSound(_ sound: SoundDefinition) {
@@ -195,12 +201,14 @@ final class HomeViewModel: ObservableObject {
                 timerRemaining = state.remaining
                 if !state.isRunning {
                     isPlaying = false
+                    playbackSessionStore.clear()
                     Task { await self.audio.stop(fadeDuration: 0.3) }
                 }
 
                 let fadeGain = FadeCurve.gain(remaining: state.remaining, fadeDuration: state.fadeDuration)
                 if state.isRunning {
                     audio.updateVolume(volume * fadeGain, rampDuration: 0.5)
+                    persistPlaybackSnapshotIfNeeded()
                 }
             }
             .store(in: &cancellables)
@@ -299,16 +307,64 @@ final class HomeViewModel: ObservableObject {
 
     private func startCryTriggeredPlayback() {
         let targetSound = catalog.first(where: { $0.id == Self.cryTriggeredSoundID }) ?? selectedSound
+        Task {
+            await startPlayback(
+                sound: targetSound,
+                duration: Self.cryTriggeredPlaybackDuration,
+                micModeEnabled: true
+            )
+        }
+    }
+
+    private func startPlayback(sound: SoundDefinition, duration: TimeInterval, micModeEnabled: Bool) async {
+        do {
+            try audio.configureSession(micModeEnabled: micModeEnabled)
+            try await audio.play(sound: sound, volume: safetyPolicy.clamped(volume: volume))
+            timer.start(duration: duration, fadeDuration: settings.timer.fadeDuration)
+            isPlaying = true
+            persistPlaybackSnapshotIfNeeded()
+        } catch {
+            isPlaying = false
+            warningBanner = "Playback failed: \(error.localizedDescription)"
+            homeLogger.error("playback failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func persistPlaybackSnapshotIfNeeded() {
+        guard isPlaying, timerRemaining > 0 else { return }
+
+        let snapshot = PlaybackSessionSnapshot(
+            soundID: selectedSound.id,
+            targetVolume: safetyPolicy.clamped(volume: volume),
+            expectedEndDate: Date().addingTimeInterval(timerRemaining),
+            micModeEnabled: cryModeEnabled
+        )
+        playbackSessionStore.save(snapshot)
+    }
+
+    private func restorePlaybackSessionIfNeeded() {
+        guard let snapshot = playbackSessionStore.load() else { return }
+        guard snapshot.isStillActive else {
+            playbackSessionStore.clear()
+            return
+        }
+        guard let sound = catalog.first(where: { $0.id == snapshot.soundID }) else {
+            playbackSessionStore.clear()
+            return
+        }
+
+        selectedSound = sound
+        volume = safetyPolicy.clamped(volume: snapshot.targetVolume)
 
         Task {
             do {
-                try audio.configureSession(micModeEnabled: true)
-                try await audio.play(sound: targetSound, volume: safetyPolicy.clamped(volume: volume))
-                timer.start(duration: Self.cryTriggeredPlaybackDuration, fadeDuration: settings.timer.fadeDuration)
+                try audio.configureSession(micModeEnabled: snapshot.micModeEnabled)
+                try await audio.play(sound: sound, volume: volume)
+                timer.start(duration: snapshot.remainingDuration, fadeDuration: settings.timer.fadeDuration)
                 isPlaying = true
             } catch {
-                isPlaying = false
-                warningBanner = "Cry response playback failed: \(error.localizedDescription)"
+                homeLogger.error("Session restoration failed: \(error.localizedDescription, privacy: .public)")
+                playbackSessionStore.clear()
             }
         }
     }

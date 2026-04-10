@@ -12,6 +12,7 @@ struct HomeView: View {
                 VStack(spacing: 18) {
                     header
                     quickStartButton
+                    presetButtons
                     stopButton
                     recentSoundsCard
                     timerCard
@@ -54,6 +55,23 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Starts the selected sound with your configured timer.")
+    }
+
+
+    private var presetButtons: some View {
+        HStack(spacing: 8) {
+            Button("Start Nap") {
+                Task { await viewModel.startPreset(.nap) }
+            }
+            .buttonStyle(.bordered)
+
+            Button("Start Bedtime") {
+                Task { await viewModel.startPreset(.bedtime) }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .tint(DreamNestTheme.accent)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var stopButton: some View {
@@ -247,7 +265,8 @@ struct HomeView: View {
         store: UserDefaultsSettingsStore(defaults: .standard),
         cryService: PreviewCryService(),
         safetyPolicy: .init(),
-        cryResponseCoordinator: CryResponseCoordinator()
+        cryResponseCoordinator: CryResponseCoordinator(),
+        playbackSessionStore: UserDefaultsPlaybackSessionStore(defaults: .standard)
     ))
 }
 

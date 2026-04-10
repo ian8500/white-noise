@@ -18,7 +18,8 @@ final class HomeViewModelCryModeTests: XCTestCase {
             store: store,
             cryService: cryService,
             safetyPolicy: .init(),
-            cryResponseCoordinator: .init()
+            cryResponseCoordinator: .init(),
+            playbackSessionStore: PlaybackSessionStoreStub()
         )
         _ = viewModel
 
@@ -45,7 +46,8 @@ final class HomeViewModelCryModeTests: XCTestCase {
             store: store,
             cryService: cryService,
             safetyPolicy: .init(),
-            cryResponseCoordinator: .init()
+            cryResponseCoordinator: .init(),
+            playbackSessionStore: PlaybackSessionStoreStub()
         )
         viewModel.isPlaying = true
 
@@ -131,4 +133,11 @@ private final class CryServiceSpy: CryDetectionControlling {
     func emit(_ signal: CryDetectionSignal) {
         subject.send(signal)
     }
+}
+
+
+private final class PlaybackSessionStoreStub: PlaybackSessionStoring {
+    func load() -> PlaybackSessionSnapshot? { nil }
+    func save(_ snapshot: PlaybackSessionSnapshot) {}
+    func clear() {}
 }
