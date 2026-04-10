@@ -184,13 +184,36 @@ public struct AppSettings: Codable, Equatable, Sendable {
 }
 
 public struct CryDetectionEvent: Codable, Equatable, Sendable, Identifiable {
+    public enum Action: String, Codable, Equatable, Sendable, CaseIterable {
+        case startedPlayback
+        case increasedVolume
+        case extendedTimer
+    }
+
     public let id: UUID
     public let timestamp: Date
     public let confidence: Float
+    public let actions: [Action]
 
-    public init(id: UUID = UUID(), timestamp: Date = Date(), confidence: Float) {
+    public init(id: UUID = UUID(), timestamp: Date = Date(), confidence: Float, actions: [Action] = []) {
         self.id = id
         self.timestamp = timestamp
         self.confidence = confidence
+        self.actions = actions
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case timestamp
+        case confidence
+        case actions
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        timestamp = try container.decodeIfPresent(Date.self, forKey: .timestamp) ?? Date()
+        confidence = try container.decodeIfPresent(Float.self, forKey: .confidence) ?? 0
+        actions = try container.decodeIfPresent([Action].self, forKey: .actions) ?? []
     }
 }

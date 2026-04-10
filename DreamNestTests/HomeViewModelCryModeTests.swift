@@ -54,6 +54,66 @@ final class HomeViewModelCryModeTests: XCTestCase {
         XCTAssertEqual(timer.extendCalls.last, 75, accuracy: 0.001)
         XCTAssertTrue(audio.playCalls.isEmpty)
     }
+
+    func testCryDetectionLogsActionsForIdleStart() async {
+        let cryService = CryServiceSpy()
+        let audio = AudioSpy()
+        let timer = TimerSpy()
+        let store = StoreSpy()
+        store.settings.cryResponse = .init(enabled: true, volumeBoostStep: 0.08, timerExtension: 120, cooldown: 30)
+
+        let viewModel = HomeViewModel(
+            catalogService: SoundCatalogService(sounds: SoundDefinition.seededCatalog),
+            audio: audio,
+            timer: timer,
+            store: store,
+            cryService: cryService,
+            safetyPolicy: .init(),
+            cryResponseCoordinator: .init()
+        )
+        _ = viewModel
+
+        cryService.emit(.init(detected: true, confidence: 0.77, date: .init(timeIntervalSince1970: 1_700_000_000)))
+        await Task.yield()
+        await Task.yield()
+
+        XCTAssertEqual(store.cryEvents.count, 1)
+        XCTAssertEqual(store.cryEvents[0].actions, [.increasedVolume, .startedPlayback])
+        XCTAssertEqual(viewModel.recentCryEvents.first?.actionDescription, "Increased volume • Started playback")
+    }
+
+    func testCooldownStateTransitionsAfterDetection() async {
+        let cryService = CryServiceSpy()
+        let audio = AudioSpy()
+        let timer = TimerSpy()
+        let store = StoreSpy()
+        store.settings.cryResponse = .init(enabled: true, volumeBoostStep: 0.08, timerExtension: 120, cooldown: 30)
+
+        var now = Date(timeIntervalSince1970: 2_000)
+        let viewModel = HomeViewModel(
+            catalogService: SoundCatalogService(sounds: SoundDefinition.seededCatalog),
+            audio: audio,
+            timer: timer,
+            store: store,
+            cryService: cryService,
+            safetyPolicy: .init(),
+            cryResponseCoordinator: .init(),
+            dateProvider: { now }
+        )
+        _ = viewModel
+
+        cryService.emit(.init(detected: true, confidence: 0.88, date: now))
+        await Task.yield()
+
+        XCTAssertTrue(viewModel.cryCooldownRemaining > 29)
+        XCTAssertTrue(viewModel.cryCooldownStatusLabel.contains("Cooling down"))
+
+        now = now.addingTimeInterval(40)
+        timer.state.send(.init(isRunning: false, remaining: 0, fadeDuration: 0))
+        await Task.yield()
+
+        XCTAssertEqual(viewModel.cryCooldownStatusLabel, "Ready")
+    }
 }
 
 private final class AudioSpy: AudioPlaybackControlling {
@@ -86,9 +146,8 @@ private final class TimerSpy: SleepTimerScheduling {
         let fadeDuration: TimeInterval
     }
 
-    var statePublisher: AnyPublisher<SleepTimerState, Never> {
-        CurrentValueSubject<SleepTimerState, Never>(.init()).eraseToAnyPublisher()
-    }
+    let state = CurrentValueSubject<SleepTimerState, Never>(.init())
+    var statePublisher: AnyPublisher<SleepTimerState, Never> { state.eraseToAnyPublisher() }
 
     private(set) var startCalls: [StartCall] = []
     private(set) var extendCalls: [TimeInterval] = []

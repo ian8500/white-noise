@@ -16,6 +16,12 @@ final class HomeViewModel: ObservableObject {
     @Published var warningBanner: String?
     @Published var cryModeEnabled: Bool
     @Published var cryDetectionThreshold: Float
+    @Published private(set) var isCryMonitoringActive = false
+    @Published private(set) var lastCryDetectionTime: Date?
+    @Published private(set) var lastCryConfidence: Float?
+    @Published private(set) var lastCryActionSummary = "No cry events yet"
+    @Published private(set) var cryCooldownRemaining: TimeInterval = 0
+    @Published private(set) var recentCryEvents: [CryEventRow] = []
     @Published private(set) var favoriteSoundIDs: Set<String>
     @Published private(set) var recentSoundIDs: [String]
     @Published private(set) var routinePresets: [RoutinePreset]
@@ -31,6 +37,7 @@ final class HomeViewModel: ObservableObject {
     private let systemVolume: SystemVolumeControlling
     private let safetyPolicy: NoiseSafetyPolicy
     private let cryResponseCoordinator: CryResponseCoordinator
+    private let dateProvider: () -> Date
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -41,7 +48,8 @@ final class HomeViewModel: ObservableObject {
         cryService: CryDetectionControlling,
         systemVolume: SystemVolumeControlling? = nil,
         safetyPolicy: NoiseSafetyPolicy,
-        cryResponseCoordinator: CryResponseCoordinator
+        cryResponseCoordinator: CryResponseCoordinator,
+        dateProvider: @escaping () -> Date = Date.init
     ) {
         self.catalog = catalogService.sounds
         self.audio = audio
@@ -51,6 +59,7 @@ final class HomeViewModel: ObservableObject {
         self.systemVolume = systemVolume ?? NoOpSystemVolumeController()
         self.safetyPolicy = safetyPolicy
         self.cryResponseCoordinator = cryResponseCoordinator
+        self.dateProvider = dateProvider
 
         settings = store.load()
         selectedSound = catalogService.sound(id: settings.lastSoundID) ?? catalogService.sounds[0]
@@ -59,6 +68,7 @@ final class HomeViewModel: ObservableObject {
         cryDetectionThreshold = settings.cryResponse.detectionThreshold
         favoriteSoundIDs = settings.favoriteSoundIDs
         recentSoundIDs = settings.recentSoundIDs
+        recentCryEvents = store.loadCryEvents(limit: 12).map(CryEventRow.init)
 
         if settings.routinePresets.isEmpty {
             settings.routinePresets = RoutinePreset.seededDefaults(using: settings)
@@ -73,6 +83,7 @@ final class HomeViewModel: ObservableObject {
         cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
         cryService.updateCooldown(settings.cryResponse.cooldown)
         startCryMonitoringIfNeeded()
+        refreshCooldownState()
     }
 
     func quickStart() {
@@ -241,6 +252,17 @@ final class HomeViewModel: ObservableObject {
         return "Starts from \(formattedTimerDuration) when you begin a sleep session."
     }
 
+    var cryMonitoringStatusLabel: String {
+        if !cryModeEnabled { return "Off" }
+        return isCryMonitoringActive ? "On" : "Unavailable"
+    }
+
+    var cryCooldownStatusLabel: String {
+        guard cryModeEnabled else { return "Monitoring off" }
+        if cryCooldownRemaining <= 0 { return "Ready" }
+        return "Cooling down (\(Int(cryCooldownRemaining.rounded(.up)))s)"
+    }
+
     func toggleCryMode(_ enabled: Bool) {
         cryModeEnabled = enabled
         settings.cryResponse.enabled = enabled
@@ -251,6 +273,8 @@ final class HomeViewModel: ObservableObject {
                 await requestPermissionAndStartCryService()
             } else {
                 cryService.stop()
+                isCryMonitoringActive = false
+                lastCryActionSummary = "Monitoring turned off"
             }
         }
     }
@@ -315,15 +339,25 @@ final class HomeViewModel: ObservableObject {
                       )
                 else { return }
 
+                lastCryDetectionTime = signal.date
+                lastCryConfidence = signal.confidence
+                var actions: [CryDetectionEvent.Action] = [.increasedVolume]
+
                 setVolume(action.targetVolume)
                 if isPlaying {
                     timer.extend(by: action.timerExtension)
+                    actions.append(.extendedTimer)
+                    lastCryActionSummary = "Increased volume and extended timer"
                 } else {
                     startCryTriggeredPlayback()
+                    actions.append(.startedPlayback)
+                    lastCryActionSummary = "Started playback and increased volume"
                 }
                 if action.shouldRecordEvent {
-                    store.appendCryEvent(.init(confidence: signal.confidence))
+                    store.appendCryEvent(.init(timestamp: signal.date, confidence: signal.confidence, actions: actions))
+                    recentCryEvents = store.loadCryEvents(limit: 12).map(CryEventRow.init)
                 }
+                refreshCooldownState()
             }
             .store(in: &cancellables)
 
@@ -337,6 +371,13 @@ final class HomeViewModel: ObservableObject {
                 audio.updateVolume(clamped, rampDuration: 0.1)
                 settings.lastVolume = clamped
                 store.save(settings)
+            }
+            .store(in: &cancellables)
+
+        Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.refreshCooldownState()
             }
             .store(in: &cancellables)
     }
@@ -377,7 +418,8 @@ final class HomeViewModel: ObservableObject {
         guard granted else {
             cryModeEnabled = false
             settings.cryResponse.enabled = false
-            warningBanner = "Microphone permission is required for cry response mode."
+            isCryMonitoringActive = false
+            warningBanner = "Microphone access is off. Enable it in Settings > Privacy & Security > Microphone to use Cry Response Mode."
             store.save(settings)
             return
         }
@@ -386,10 +428,13 @@ final class HomeViewModel: ObservableObject {
             cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
             cryService.updateCooldown(settings.cryResponse.cooldown)
             try cryService.start()
+            isCryMonitoringActive = true
+            lastCryActionSummary = "Monitoring and waiting for cry patterns"
         } catch {
             cryModeEnabled = false
             settings.cryResponse.enabled = false
-            warningBanner = "Unable to start cry detection: \(error.localizedDescription)"
+            isCryMonitoringActive = false
+            warningBanner = "Cry monitoring couldn’t start. Confirm microphone availability and try again. Error: \(error.localizedDescription)"
             store.save(settings)
         }
     }
@@ -405,8 +450,47 @@ final class HomeViewModel: ObservableObject {
                 isPlaying = true
             } catch {
                 isPlaying = false
-                warningBanner = "Cry response playback failed: \(error.localizedDescription)"
+                warningBanner = "Cry detected, but audio couldn’t start. Check output route and try again. Error: \(error.localizedDescription)"
+                lastCryActionSummary = "Cry detected but playback start failed"
             }
+        }
+    }
+
+    private func refreshCooldownState() {
+        cryCooldownRemaining = cryResponseCoordinator.cooldownRemaining(
+            at: dateProvider(),
+            settings: settings.cryResponse
+        )
+    }
+}
+
+extension HomeViewModel {
+    struct CryEventRow: Identifiable, Equatable {
+        let id: UUID
+        let timestamp: Date
+        let confidence: Float
+        let actionDescription: String
+
+        init(event: CryDetectionEvent) {
+            id = event.id
+            timestamp = event.timestamp
+            confidence = event.confidence
+            actionDescription = event.actions.isEmpty
+                ? "Action recorded"
+                : event.actions.map(\.label).joined(separator: " • ")
+        }
+    }
+}
+
+private extension CryDetectionEvent.Action {
+    var label: String {
+        switch self {
+        case .startedPlayback:
+            return "Started playback"
+        case .increasedVolume:
+            return "Increased volume"
+        case .extendedTimer:
+            return "Extended timer"
         }
     }
 }
