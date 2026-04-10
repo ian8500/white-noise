@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var showStartRoutineDialog = false
     @State private var selectedPresetForQuickControls: PlaybackPreset?
     @State private var suppressNextPresetTap: PlaybackPreset?
+    @State private var pressedQuickPreset: PlaybackPreset?
 
     var body: some View {
         ZStack {
@@ -157,6 +158,7 @@ struct HomeView: View {
     private func quickPresetButton(for preset: PlaybackPreset, prominent: Bool) -> some View {
         let config = viewModel.quickPresetConfiguration(for: preset)
         let presetSound = viewModel.quickPresetSound(for: preset)
+        let isPressed = pressedQuickPreset == preset
         let label = HStack(alignment: .center, spacing: 10) {
             ZStack {
                 Circle()
@@ -177,42 +179,60 @@ struct HomeView: View {
             }
 
             Spacer(minLength: 0)
+
+            Text("Long Press")
+                .font(.caption2.weight(.semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill((prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent).opacity(0.16))
+                )
+                .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.9) : DreamNestTheme.accent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-
-        if prominent {
-            Button {
+        label
+            .foregroundStyle(prominent ? DreamNestTheme.primaryText : DreamNestTheme.primaryText)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(prominent ? DreamNestTheme.accent : DreamNestTheme.cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(prominent ? DreamNestTheme.accent.opacity(0.35) : DreamNestTheme.accent.opacity(0.26), lineWidth: 1)
+            )
+            .scaleEffect(isPressed ? 0.985 : 1)
+            .shadow(color: DreamNestTheme.accent.opacity(prominent ? 0.24 : 0.10), radius: prominent ? 10 : 6, y: 3)
+            .animation(.easeOut(duration: 0.12), value: isPressed)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .onTapGesture {
                 if suppressNextPresetTap == preset {
                     suppressNextPresetTap = nil
                     return
                 }
                 Task { await viewModel.startPreset(preset) }
-            } label: {
-                label
             }
-            .buttonStyle(BorderedProminentButtonStyle())
-            .onLongPressGesture(minimumDuration: 0.5) {
-                suppressNextPresetTap = preset
-                selectedPresetForQuickControls = preset
-            }
-        } else {
-            Button {
-                if suppressNextPresetTap == preset {
-                    suppressNextPresetTap = nil
-                    return
-                }
-                Task { await viewModel.startPreset(preset) }
-            } label: {
-                label
-            }
-            .buttonStyle(BorderedButtonStyle())
-            .onLongPressGesture(minimumDuration: 0.5) {
-                suppressNextPresetTap = preset
-                selectedPresetForQuickControls = preset
-            }
-        }
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.5)
+                    .onEnded { _ in
+                        suppressNextPresetTap = preset
+                        pressedQuickPreset = nil
+                        selectedPresetForQuickControls = preset
+                    }
+            )
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        pressedQuickPreset = preset
+                    }
+                    .onEnded { _ in
+                        pressedQuickPreset = nil
+                    }
+            )
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Tap to start \(preset.title). Long press for quick controls.")
     }
 
     private var presetConfigCardContent: some View {
