@@ -1,5 +1,8 @@
 import Combine
 import Foundation
+import OSLog
+
+private let homeLogger = Logger(subsystem: "com.dreamnest.app", category: "Home")
 
 @MainActor
 final class HomeViewModel: ObservableObject {
@@ -71,7 +74,7 @@ final class HomeViewModel: ObservableObject {
             } catch {
                 isPlaying = false
                 warningBanner = "Playback failed: \(error.localizedDescription)"
-                print("[Home] ❌ quickStart failed: \(error.localizedDescription)")
+                homeLogger.error("quickStart failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
