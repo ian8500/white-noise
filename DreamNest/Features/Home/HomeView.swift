@@ -4,9 +4,9 @@ import Combine
 struct HomeView: View {
     @StateObject var viewModel: HomeViewModel
     @State private var isVolumeExpanded = true
-    @State private var isPresetConfigExpanded = false
     @State private var isCryEventsExpanded = true
     @State private var showStartRoutineDialog = false
+    @State private var suppressNextStartRoutineTap = false
     @State private var selectedPresetForQuickControls: PlaybackPreset?
     @State private var suppressNextPresetTap: PlaybackPreset?
     @State private var pressedQuickPreset: PlaybackPreset?
@@ -23,9 +23,6 @@ struct HomeView: View {
                     presetButtons
                     ExpandableSettingsCard(title: "Volume", isExpanded: $isVolumeExpanded) {
                         volumeCardContent
-                    }
-                    ExpandableSettingsCard(title: "Nap & Bedtime Presets", isExpanded: $isPresetConfigExpanded) {
-                        presetConfigCardContent
                     }
                     ExpandableSettingsCard(title: "Cry Detection Events", isExpanded: $isCryEventsExpanded) {
                         cryDetectionEventsContent
@@ -98,8 +95,15 @@ struct HomeView: View {
         .padding(.vertical, 14)
         .background(DreamNestTheme.accent)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .onTapGesture(perform: viewModel.startDefaultRoutine)
+        .onTapGesture {
+            if suppressNextStartRoutineTap {
+                suppressNextStartRoutineTap = false
+                return
+            }
+            viewModel.startDefaultRoutine()
+        }
         .onLongPressGesture(minimumDuration: 0.5) {
+            suppressNextStartRoutineTap = true
             showStartRoutineDialog = true
         }
         .accessibilityAddTraits(.isButton)
@@ -235,94 +239,12 @@ struct HomeView: View {
             .accessibilityHint("Tap to start \(preset.title). Long press for quick controls.")
     }
 
-    private var presetConfigCardContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Tune your Quick Start buttons with preferred durations and cry response behavior.")
-                .font(.footnote)
-                .foregroundStyle(DreamNestTheme.secondaryText)
-            presetConfigRow(for: .nap)
-            presetConfigRow(for: .bedtime)
-        }
-    }
-
-    private func presetConfigRow(for preset: PlaybackPreset) -> some View {
-        let config = viewModel.quickPresetConfiguration(for: preset)
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(preset.title)
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Text("\(Int(config.duration / 60)) minutes")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(DreamNestTheme.secondaryText)
-            }
-            HStack(spacing: 8) {
-                timerStepButton(title: "-5m") {
-                    let updated = max(1, Int(config.duration / 60) - 5)
-                    viewModel.updateQuickPreset(preset, durationMinutes: updated)
-                }
-                timerStepButton(title: "-1m") {
-                    let updated = max(1, Int(config.duration / 60) - 1)
-                    viewModel.updateQuickPreset(preset, durationMinutes: updated)
-                }
-                timerStepButton(title: "+1m") {
-                    viewModel.updateQuickPreset(preset, durationMinutes: Int(config.duration / 60) + 1)
-                }
-                timerStepButton(title: "+5m") {
-                    viewModel.updateQuickPreset(preset, durationMinutes: Int(config.duration / 60) + 5)
-                }
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Sound")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(DreamNestTheme.secondaryText)
-                Menu {
-                    ForEach(viewModel.catalog) { sound in
-                        Button {
-                            viewModel.updateQuickPreset(preset, soundID: sound.id)
-                        } label: {
-                            if viewModel.quickPresetSound(for: preset).id == sound.id {
-                                Label(sound.title, systemImage: "checkmark")
-                            } else {
-                                Text(sound.title)
-                            }
-                        }
-                    }
-                } label: {
-                    HStack {
-                        Text(viewModel.quickPresetSound(for: preset).title)
-                            .lineLimit(1)
-                        Spacer()
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(DreamNestTheme.secondaryText)
-                    }
-                    .font(.footnote.weight(.medium))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 9)
-                    .background(DreamNestTheme.background.opacity(0.8))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-            }
-
-            Toggle("Enable cry response", isOn: Binding(
-                get: { viewModel.quickPresetConfiguration(for: preset).cryModeEnabled },
-                set: { viewModel.updateQuickPreset(preset, cryModeEnabled: $0) }
-            ))
-            .tint(DreamNestTheme.accent)
-            .font(.footnote)
-        }
-        .padding(12)
-        .background(DreamNestTheme.cardBackground.opacity(0.65))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
     private func timerStepButton(title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
             .font(.caption.weight(.semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(DreamNestTheme.background.opacity(0.8))
+            .background(DreamNestTheme.elevatedControlBackground)
             .clipShape(Capsule())
             .foregroundStyle(DreamNestTheme.primaryText)
     }
@@ -380,7 +302,7 @@ struct HomeView: View {
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(DreamNestTheme.primaryText)
                             .padding(8)
-                            .background(DreamNestTheme.background.opacity(0.85))
+                            .background(DreamNestTheme.elevatedControlBackground)
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
@@ -427,7 +349,7 @@ struct HomeView: View {
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 10)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(DreamNestTheme.background.opacity(0.85))
+                                    .background(DreamNestTheme.elevatedControlBackground)
                                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 }
                                 .buttonStyle(.plain)
@@ -449,7 +371,7 @@ struct HomeView: View {
             }
             .padding(16)
             .frame(maxWidth: 420)
-            .background(DreamNestTheme.cardBackground)
+            .background(DreamNestTheme.modalBackground)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -491,7 +413,7 @@ struct HomeView: View {
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(DreamNestTheme.primaryText)
                             .padding(8)
-                            .background(DreamNestTheme.background.opacity(0.85))
+                            .background(DreamNestTheme.elevatedControlBackground)
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
@@ -550,7 +472,7 @@ struct HomeView: View {
                         .font(.footnote.weight(.medium))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 9)
-                        .background(DreamNestTheme.background.opacity(0.8))
+                        .background(DreamNestTheme.elevatedControlBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                 }
@@ -575,7 +497,7 @@ struct HomeView: View {
             }
             .padding(16)
             .frame(maxWidth: 420)
-            .background(DreamNestTheme.cardBackground)
+            .background(DreamNestTheme.modalBackground)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
