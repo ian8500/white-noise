@@ -32,6 +32,25 @@ final class HomeViewModelTimerTests: XCTestCase {
         XCTAssertEqual(timer.extendCalls.last, -60, accuracy: 0.001)
     }
 
+    func testViewModelInitializationResetsTimerDurationToThirtyMinutes() {
+        let timer = TimerSpy()
+        let store = StoreStub()
+        store.settings.timer.duration = 45 * 60
+
+        _ = HomeViewModel(
+            catalogService: CatalogStub(),
+            audio: AudioStub(),
+            timer: timer,
+            store: store,
+            cryService: CryStub(),
+            safetyPolicy: .init(),
+            cryResponseCoordinator: .init(),
+            playbackSessionStore: PlaybackSessionStoreStub()
+        )
+
+        XCTAssertEqual(store.settings.timer.duration, 30 * 60, accuracy: 0.001)
+    }
+
     func testRoutinePresetPersistenceRoundTrip() {
         let defaults = UserDefaults(suiteName: #function)!
         defaults.removePersistentDomain(forName: #function)

@@ -8,6 +8,7 @@ private let homeLogger = Logger(subsystem: "com.dreamnest.app", category: "Home"
 final class HomeViewModel: ObservableObject {
     private static let cryTriggeredPlaybackDuration: TimeInterval = 5 * 60
     private static let cryTriggeredSoundID = "white-noise"
+    private static let defaultRoutineDuration: TimeInterval = 30 * 60
 
     @Published var selectedSound: SoundDefinition
     @Published var volume: Float
@@ -69,6 +70,8 @@ final class HomeViewModel: ObservableObject {
         self.dateProvider = dateProvider
 
         settings = store.load()
+        settings.timer.duration = Self.defaultRoutineDuration
+        store.save(settings)
         selectedSound = catalogService.sound(id: settings.lastSoundID) ?? catalogService.sounds[0]
         volume = safetyPolicy.clamped(volume: self.systemVolume.currentVolume)
         cryModeEnabled = settings.cryResponse.enabled
