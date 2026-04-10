@@ -167,11 +167,14 @@ final class HomeViewModel: ObservableObject {
     }
 
     func stopPlayback() {
+        Task { await stopPlaybackFromAutomation() }
+    }
+
+    func stopPlaybackFromAutomation() async {
         timer.cancel()
-        Task {
-            await audio.stop(fadeDuration: 0.3)
-            isPlaying = false
-        }
+        playbackSessionStore.clear()
+        await audio.stop(fadeDuration: 0.3)
+        isPlaying = false
     }
 
     func setVolume(_ value: Float) {
@@ -184,6 +187,7 @@ final class HomeViewModel: ObservableObject {
         audio.updateVolume(clamped, rampDuration: 0.25)
         settings.lastVolume = clamped
         store.save(settings)
+        persistPlaybackSnapshotIfNeeded()
     }
 
     func selectSound(_ sound: SoundDefinition) {
@@ -316,12 +320,14 @@ final class HomeViewModel: ObservableObject {
                 timerRemaining = state.remaining
                 if !state.isRunning {
                     isPlaying = false
+                    playbackSessionStore.clear()
                     Task { await self.audio.stop(fadeDuration: 0.3) }
                 }
 
                 let fadeGain = FadeCurve.gain(remaining: state.remaining, fadeDuration: state.fadeDuration)
                 if state.isRunning {
                     audio.updateVolume(volume * fadeGain, rampDuration: 0.5)
+                    persistPlaybackSnapshotIfNeeded()
                 }
             }
             .store(in: &cancellables)
@@ -441,12 +447,60 @@ final class HomeViewModel: ObservableObject {
 
     private func startCryTriggeredPlayback() {
         let targetSound = catalog.first(where: { $0.id == Self.cryTriggeredSoundID }) ?? selectedSound
+        Task {
+            await startPlayback(
+                sound: targetSound,
+                duration: Self.cryTriggeredPlaybackDuration,
+                micModeEnabled: true
+            )
+        }
+    }
+
+    private func startPlayback(sound: SoundDefinition, duration: TimeInterval, micModeEnabled: Bool) async {
+        do {
+            try audio.configureSession(micModeEnabled: micModeEnabled)
+            try await audio.play(sound: sound, volume: safetyPolicy.clamped(volume: volume))
+            timer.start(duration: duration, fadeDuration: settings.timer.fadeDuration)
+            isPlaying = true
+            persistPlaybackSnapshotIfNeeded()
+        } catch {
+            isPlaying = false
+            warningBanner = "Playback failed: \(error.localizedDescription)"
+            homeLogger.error("playback failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func persistPlaybackSnapshotIfNeeded() {
+        guard isPlaying, timerRemaining > 0 else { return }
+
+        let snapshot = PlaybackSessionSnapshot(
+            soundID: selectedSound.id,
+            targetVolume: safetyPolicy.clamped(volume: volume),
+            expectedEndDate: Date().addingTimeInterval(timerRemaining),
+            micModeEnabled: cryModeEnabled
+        )
+        playbackSessionStore.save(snapshot)
+    }
+
+    private func restorePlaybackSessionIfNeeded() {
+        guard let snapshot = playbackSessionStore.load() else { return }
+        guard snapshot.isStillActive else {
+            playbackSessionStore.clear()
+            return
+        }
+        guard let sound = catalog.first(where: { $0.id == snapshot.soundID }) else {
+            playbackSessionStore.clear()
+            return
+        }
+
+        selectedSound = sound
+        volume = safetyPolicy.clamped(volume: snapshot.targetVolume)
 
         Task {
             do {
-                try audio.configureSession(micModeEnabled: true)
-                try await audio.play(sound: targetSound, volume: safetyPolicy.clamped(volume: volume))
-                timer.start(duration: Self.cryTriggeredPlaybackDuration, fadeDuration: settings.timer.fadeDuration)
+                try audio.configureSession(micModeEnabled: snapshot.micModeEnabled)
+                try await audio.play(sound: sound, volume: volume)
+                timer.start(duration: snapshot.remainingDuration, fadeDuration: settings.timer.fadeDuration)
                 isPlaying = true
             } catch {
                 isPlaying = false

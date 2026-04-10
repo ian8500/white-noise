@@ -80,7 +80,8 @@ final class HomeViewModelTimerTests: XCTestCase {
             store: StoreStub(),
             cryService: CryStub(),
             safetyPolicy: .init(),
-            cryResponseCoordinator: .init()
+            cryResponseCoordinator: .init(),
+            playbackSessionStore: PlaybackSessionStoreStub()
         )
     }
 }
@@ -139,4 +140,11 @@ private final class CryStub: CryDetectionControlling {
     func stop() {}
     func updateDetectionThreshold(_ threshold: Float) {}
     func updateCooldown(_ cooldown: TimeInterval) {}
+}
+
+
+private final class PlaybackSessionStoreStub: PlaybackSessionStoring {
+    func load() -> PlaybackSessionSnapshot? { nil }
+    func save(_ snapshot: PlaybackSessionSnapshot) {}
+    func clear() {}
 }
