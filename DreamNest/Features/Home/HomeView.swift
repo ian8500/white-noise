@@ -3,11 +3,11 @@ import Combine
 
 struct HomeView: View {
     @StateObject var viewModel: HomeViewModel
-    @State private var isRecentExpanded = false
-    @State private var isTimerExpanded = true
     @State private var isVolumeExpanded = true
     @State private var isSoundExpanded = true
     @State private var isPresetConfigExpanded = false
+    @State private var isCryEventsExpanded = true
+    @State private var showSleepTimerDialog = false
 
     var body: some View {
         ZStack {
@@ -19,20 +19,17 @@ struct HomeView: View {
                     timerHeroCard
                     controlButtons
                     presetButtons
-                    ExpandableSettingsCard(title: "Nap & Bedtime Presets", isExpanded: $isPresetConfigExpanded) {
-                        presetConfigCardContent
-                    }
-                    ExpandableSettingsCard(title: "Sleep Timer Controls", isExpanded: $isTimerExpanded) {
-                        timerCardContent
-                    }
                     ExpandableSettingsCard(title: "Volume", isExpanded: $isVolumeExpanded) {
                         volumeCardContent
                     }
                     ExpandableSettingsCard(title: "Sound", isExpanded: $isSoundExpanded) {
                         soundPickerContent
                     }
-                    ExpandableSettingsCard(title: "Recent", isExpanded: $isRecentExpanded) {
-                        recentSoundsCardContent
+                    ExpandableSettingsCard(title: "Nap & Bedtime Presets", isExpanded: $isPresetConfigExpanded) {
+                        presetConfigCardContent
+                    }
+                    ExpandableSettingsCard(title: "Cry Detection Events", isExpanded: $isCryEventsExpanded) {
+                        cryDetectionEventsContent
                     }
                 }
                 .padding()
@@ -44,6 +41,20 @@ struct HomeView: View {
         }, message: {
             Text(viewModel.warningBanner ?? "")
         })
+        .confirmationDialog("Sleep Timer Controls", isPresented: $showSleepTimerDialog, titleVisibility: .visible) {
+            Button("Set to 60 minutes") { viewModel.applyTimerPreset(minutes: 60) }
+            Button("Set to 30 minutes") { viewModel.applyTimerPreset(minutes: 30) }
+            Button("Set to 15 minutes") { viewModel.applyTimerPreset(minutes: 15) }
+            Button("Decrease by 10 minutes") { viewModel.adjustTimerDuration(minutesDelta: -10) }
+            Button("Decrease by 5 minutes") { viewModel.adjustTimerDuration(minutesDelta: -5) }
+            Button("Decrease by 1 minute") { viewModel.adjustTimerDuration(minutesDelta: -1) }
+            Button("Increase by 10 minutes") { viewModel.adjustTimerDuration(minutesDelta: 10) }
+            Button("Increase by 5 minutes") { viewModel.adjustTimerDuration(minutesDelta: 5) }
+            Button("Increase by 1 minute") { viewModel.adjustTimerDuration(minutesDelta: 1) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Long press Start Routine to quickly adjust your sleep timer.")
+        }
     }
 
     private var header: some View {
@@ -68,15 +79,30 @@ struct HomeView: View {
     }
 
     private var quickStartButton: some View {
-        Button(action: viewModel.startDefaultRoutine) {
+        VStack(alignment: .leading, spacing: 8) {
             Label("Start Routine", systemImage: "moon.zzz.fill")
                 .font(.title3.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(DreamNestTheme.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            HStack(spacing: 8) {
+                Image(systemName: "timer")
+                    .font(.caption.weight(.semibold))
+                Text("Sleep timer: \(viewModel.formattedTimerDuration)")
+                    .font(.footnote.weight(.medium))
+                Spacer()
+                Text("Long press to adjust")
+                    .font(.caption)
+                    .foregroundStyle(DreamNestTheme.primaryText.opacity(0.85))
+            }
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .background(DreamNestTheme.accent)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onTapGesture(perform: viewModel.startDefaultRoutine)
+        .onLongPressGesture(minimumDuration: 0.5) {
+            showSleepTimerDialog = true
+        }
+        .accessibilityAddTraits(.isButton)
         .accessibilityHint("Starts your default routine preset, or current settings if no default is set.")
     }
 
@@ -286,40 +312,6 @@ struct HomeView: View {
         .accessibilityHint("Stops audio playback and cancels the active timer.")
     }
 
-    private var timerCardContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Adjust duration for your next playback session or while audio is running.")
-                .font(.footnote)
-                .foregroundStyle(DreamNestTheme.secondaryText)
-
-            HStack {
-                timerPresetButton("60m", minutes: 60)
-                timerPresetButton("30m", minutes: 30)
-                timerPresetButton("15m", minutes: 15)
-            }
-            HStack {
-                timerAdjustButton("-10m", minutesDelta: -10)
-                timerAdjustButton("-5m", minutesDelta: -5)
-                timerAdjustButton("-1m", minutesDelta: -1)
-            }
-            HStack {
-                timerAdjustButton("+10m", minutesDelta: 10)
-                timerAdjustButton("+5m", minutesDelta: 5)
-                timerAdjustButton("+1m", minutesDelta: 1)
-            }
-        }
-    }
-
-    private func timerPresetButton(_ title: String, minutes: Int) -> some View {
-        ChipButton(title: title) { viewModel.applyTimerPreset(minutes: minutes) }
-            .accessibilityLabel("Set timer to \(minutes) minutes")
-    }
-
-    private func timerAdjustButton(_ title: String, minutesDelta: Int) -> some View {
-        ChipButton(title: title) { viewModel.adjustTimerDuration(minutesDelta: minutesDelta) }
-            .accessibilityLabel("\(minutesDelta >= 0 ? "Increase" : "Decrease") timer by \(abs(minutesDelta)) minutes")
-    }
-
     private var volumeCardContent: some View {
         Slider(value: Binding(
             get: { Double(viewModel.volume) },
@@ -361,18 +353,42 @@ struct HomeView: View {
     }
 
 
-    private var recentSoundsCardContent: some View {
-        Group {
-            if viewModel.recentSounds.isEmpty {
-                Text("Your last selected sounds appear here.")
+    private var cryDetectionEventsContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Recent trigger actions")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(DreamNestTheme.secondaryText)
+                Spacer()
+                Button("Clear Triggers", role: .destructive, action: viewModel.clearCryEvents)
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.plain)
+            }
+
+            if viewModel.recentCryEvents.isEmpty {
+                Text("No cry detection events have been recorded yet.")
                     .foregroundStyle(DreamNestTheme.secondaryText)
                     .font(.footnote)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(viewModel.recentSounds) { sound in
-                            ChipButton(title: sound.title) { viewModel.selectSound(sound) }
+                VStack(spacing: 8) {
+                    ForEach(viewModel.recentCryEvents) { event in
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "waveform.and.mic")
+                                .foregroundStyle(DreamNestTheme.accent)
+                                .padding(.top, 2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(event.actionDescription)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(DreamNestTheme.primaryText)
+                                Text("\(event.timestamp.formatted(date: .abbreviated, time: .shortened)) • Confidence \(Int(event.confidence * 100))%")
+                                    .font(.caption)
+                                    .foregroundStyle(DreamNestTheme.secondaryText)
+                            }
+                            Spacer()
                         }
+                        .padding(10)
+                        .background(DreamNestTheme.background.opacity(0.75))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                 }
             }
@@ -418,20 +434,6 @@ private struct ExpandableSettingsCard<Content: View>: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(DreamNestTheme.secondaryText.opacity(0.16), lineWidth: 1)
         )
-    }
-}
-
-private struct ChipButton: View {
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(title, action: action)
-            .foregroundStyle(DreamNestTheme.primaryText)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(DreamNestTheme.cardBackground.opacity(0.9))
-            .clipShape(Capsule())
     }
 }
 
