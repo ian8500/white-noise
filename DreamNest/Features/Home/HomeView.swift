@@ -3,14 +3,11 @@ import Combine
 
 struct HomeView: View {
     @StateObject var viewModel: HomeViewModel
-    @State private var isCryStatusExpanded = false
-    @State private var isCryEventsExpanded = false
     @State private var isRecentExpanded = false
     @State private var isTimerExpanded = true
     @State private var isVolumeExpanded = true
     @State private var isSoundExpanded = true
     @State private var isPresetConfigExpanded = false
-    @State private var isCryModeExpanded = false
 
     var body: some View {
         ZStack {
@@ -20,12 +17,11 @@ struct HomeView: View {
                 VStack(spacing: 18) {
                     header
                     timerHeroCard
-                    quickStartButton
+                    controlButtons
                     presetButtons
                     ExpandableSettingsCard(title: "Nap & Bedtime Presets", isExpanded: $isPresetConfigExpanded) {
                         presetConfigCardContent
                     }
-                    stopButton
                     ExpandableSettingsCard(title: "Sleep Timer Controls", isExpanded: $isTimerExpanded) {
                         timerCardContent
                     }
@@ -37,15 +33,6 @@ struct HomeView: View {
                     }
                     ExpandableSettingsCard(title: "Recent", isExpanded: $isRecentExpanded) {
                         recentSoundsCardContent
-                    }
-                    ExpandableSettingsCard(title: "Cry Response Mode", isExpanded: $isCryModeExpanded) {
-                        cryModeCardContent
-                    }
-                    ExpandableSettingsCard(title: "Cry Response Status", isExpanded: $isCryStatusExpanded) {
-                        cryStatusCardContent
-                    }
-                    ExpandableSettingsCard(title: "Recent Cry Events", isExpanded: $isCryEventsExpanded) {
-                        cryEventLogCardContent
                     }
                 }
                 .padding()
@@ -70,6 +57,14 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("DreamNest. Premium white noise for calmer bedtimes.")
+    }
+
+
+    private var controlButtons: some View {
+        VStack(spacing: 10) {
+            quickStartButton
+            stopButton
+        }
     }
 
     private var quickStartButton: some View {
@@ -365,92 +360,6 @@ struct HomeView: View {
         }
     }
 
-    private var cryModeCardContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Enable smart soothing response")
-                    .foregroundStyle(DreamNestTheme.secondaryText)
-                Spacer()
-                Toggle("", isOn: Binding(
-                    get: { viewModel.cryModeEnabled },
-                    set: { viewModel.toggleCryMode($0) }
-                ))
-                .labelsHidden()
-                .accessibilityLabel("Cry response mode")
-            }
-            Text("On-device detection only")
-                .foregroundStyle(DreamNestTheme.secondaryText)
-                .font(.footnote)
-        }
-    }
-
-    private var cryStatusCardContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            cryStatusRow(title: "Monitoring", value: viewModel.cryMonitoringStatusLabel)
-            cryStatusRow(title: "Last detection", value: formattedDate(viewModel.lastCryDetectionTime))
-            cryStatusRow(title: "Last confidence", value: formattedConfidence(viewModel.lastCryConfidence))
-            cryStatusRow(title: "Cooldown", value: viewModel.cryCooldownStatusLabel)
-            cryStatusRow(title: "Last action", value: viewModel.lastCryActionSummary)
-        }
-    }
-
-    private var cryEventLogCardContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Last detections and actions")
-                    .font(.footnote)
-                    .foregroundStyle(DreamNestTheme.secondaryText)
-                Spacer()
-                if !viewModel.recentCryEvents.isEmpty {
-                    Button("Clear") {
-                        viewModel.clearCryEvents()
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.red.opacity(0.9))
-                }
-            }
-            if viewModel.recentCryEvents.isEmpty {
-                Text("Cry responses will appear here with confidence and actions.")
-                    .foregroundStyle(DreamNestTheme.secondaryText)
-                    .font(.footnote)
-            } else {
-                ForEach(viewModel.recentCryEvents.prefix(6)) { event in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(formattedDate(event.timestamp)) • \(formattedConfidence(event.confidence))")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(DreamNestTheme.primaryText)
-                        Text(event.actionDescription)
-                            .font(.footnote)
-                            .foregroundStyle(DreamNestTheme.secondaryText)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 4)
-                }
-            }
-        }
-    }
-
-    private func cryStatusRow(title: String, value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(title)
-                .foregroundStyle(DreamNestTheme.secondaryText)
-            Spacer()
-            Text(value)
-                .foregroundStyle(DreamNestTheme.primaryText)
-                .multilineTextAlignment(.trailing)
-        }
-        .font(.footnote)
-    }
-
-    private func formattedDate(_ date: Date?) -> String {
-        guard let date else { return "Not yet" }
-        return date.formatted(date: .omitted, time: .shortened)
-    }
-
-    private func formattedConfidence(_ confidence: Float?) -> String {
-        guard let confidence else { return "Not available" }
-        return "\(Int((confidence * 100).rounded()))%"
-    }
 
     private var recentSoundsCardContent: some View {
         Group {
