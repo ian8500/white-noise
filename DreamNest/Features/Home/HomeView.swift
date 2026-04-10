@@ -395,7 +395,7 @@ private struct ChipButton: View {
         catalogService: SoundCatalogService(),
         audio: PreviewAudioService(),
         timer: SleepTimerEngine(),
-        store: UserDefaultsSettingsStore(defaults: .standard),
+        store: PreviewSettingsStore(),
         cryService: PreviewCryService(),
         safetyPolicy: .init(),
         cryResponseCoordinator: CryResponseCoordinator(),
@@ -420,4 +420,13 @@ private final class PreviewCryService: CryDetectionControlling {
     func stop() {}
     func updateDetectionThreshold(_ threshold: Float) {}
     func updateCooldown(_ cooldown: TimeInterval) {}
+}
+
+private final class PreviewSettingsStore: SettingsStoring {
+    private var settings = PreviewData.sampleSettings
+
+    func load() -> AppSettings { settings }
+    func save(_ settings: AppSettings) { self.settings = settings }
+    func appendCryEvent(_ event: CryDetectionEvent) {}
+    func loadCryEvents(limit: Int) -> [CryDetectionEvent] { Array(PreviewData.sampleCryEvents.suffix(limit)) }
 }
