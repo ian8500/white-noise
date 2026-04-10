@@ -8,6 +8,8 @@ struct HomeView: View {
     @State private var isPresetConfigExpanded = false
     @State private var isCryEventsExpanded = true
     @State private var showSleepTimerDialog = false
+    @State private var selectedPresetForQuickControls: PlaybackPreset?
+    @State private var suppressNextPresetTap: PlaybackPreset?
 
     var body: some View {
         ZStack {
@@ -55,6 +57,56 @@ struct HomeView: View {
         } message: {
             Text("Long press Start Routine to quickly adjust your sleep timer.")
         }
+        .confirmationDialog(
+            quickPresetDialogTitle,
+            isPresented: Binding(
+                get: { selectedPresetForQuickControls != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        selectedPresetForQuickControls = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let preset = selectedPresetForQuickControls {
+                let minutes = Int(viewModel.quickPresetConfiguration(for: preset).duration / 60)
+                let cryModeEnabled = viewModel.quickPresetConfiguration(for: preset).cryModeEnabled
+                Button("Increase by 10 minutes") {
+                    viewModel.updateQuickPreset(preset, durationMinutes: minutes + 10)
+                }
+                Button("Increase by 5 minutes") {
+                    viewModel.updateQuickPreset(preset, durationMinutes: minutes + 5)
+                }
+                Button("Increase by 1 minute") {
+                    viewModel.updateQuickPreset(preset, durationMinutes: minutes + 1)
+                }
+                Button("Decrease by 10 minutes") {
+                    viewModel.updateQuickPreset(preset, durationMinutes: max(1, minutes - 10))
+                }
+                Button("Decrease by 5 minutes") {
+                    viewModel.updateQuickPreset(preset, durationMinutes: max(1, minutes - 5))
+                }
+                Button("Decrease by 1 minute") {
+                    viewModel.updateQuickPreset(preset, durationMinutes: max(1, minutes - 1))
+                }
+                Button(cryModeEnabled ? "Turn Cry Mode Off" : "Turn Cry Mode On") {
+                    viewModel.updateQuickPreset(preset, cryModeEnabled: !cryModeEnabled)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if let preset = selectedPresetForQuickControls {
+                Text("Long press detected. Fine-tune your \(preset.title.lowercased()) preset without changing the current layout.")
+            }
+        }
+    }
+
+    private var quickPresetDialogTitle: String {
+        if let preset = selectedPresetForQuickControls {
+            return "\(preset.title) Preset Controls"
+        }
+        return "Preset Controls"
     }
 
     private var header: some View {
@@ -185,18 +237,34 @@ struct HomeView: View {
 
         if prominent {
             Button {
+                if suppressNextPresetTap == preset {
+                    suppressNextPresetTap = nil
+                    return
+                }
                 Task { await viewModel.startPreset(preset) }
             } label: {
                 label
             }
             .buttonStyle(BorderedProminentButtonStyle())
+            .onLongPressGesture(minimumDuration: 0.5) {
+                suppressNextPresetTap = preset
+                selectedPresetForQuickControls = preset
+            }
         } else {
             Button {
+                if suppressNextPresetTap == preset {
+                    suppressNextPresetTap = nil
+                    return
+                }
                 Task { await viewModel.startPreset(preset) }
             } label: {
                 label
             }
             .buttonStyle(BorderedButtonStyle())
+            .onLongPressGesture(minimumDuration: 0.5) {
+                suppressNextPresetTap = preset
+                selectedPresetForQuickControls = preset
+            }
         }
     }
 
