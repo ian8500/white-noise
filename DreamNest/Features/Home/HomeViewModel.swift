@@ -23,6 +23,7 @@ final class HomeViewModel: ObservableObject {
     private let timer: SleepTimerScheduling
     private let store: SettingsStoring
     private let cryService: CryDetectionControlling
+    private let systemVolume: SystemVolumeControlling
     private let safetyPolicy: NoiseSafetyPolicy
     private let cryResponseCoordinator: CryResponseCoordinator
     private var cancellables = Set<AnyCancellable>()
@@ -33,6 +34,7 @@ final class HomeViewModel: ObservableObject {
         timer: SleepTimerScheduling,
         store: SettingsStoring,
         cryService: CryDetectionControlling,
+        systemVolume: SystemVolumeControlling? = nil,
         safetyPolicy: NoiseSafetyPolicy,
         cryResponseCoordinator: CryResponseCoordinator
     ) {
@@ -41,12 +43,13 @@ final class HomeViewModel: ObservableObject {
         self.timer = timer
         self.store = store
         self.cryService = cryService
+        self.systemVolume = systemVolume ?? NoOpSystemVolumeController()
         self.safetyPolicy = safetyPolicy
         self.cryResponseCoordinator = cryResponseCoordinator
 
         settings = store.load()
         selectedSound = catalogService.sound(id: settings.lastSoundID) ?? catalogService.sounds[0]
-        volume = settings.lastVolume
+        volume = safetyPolicy.clamped(volume: self.systemVolume.currentVolume)
         cryModeEnabled = settings.cryResponse.enabled
         cryDetectionThreshold = settings.cryResponse.detectionThreshold
         favoriteSoundIDs = settings.favoriteSoundIDs
@@ -87,6 +90,7 @@ final class HomeViewModel: ObservableObject {
             warningBanner = "Volume capped for hearing safety guidance."
         }
         volume = clamped
+        systemVolume.setSystemVolume(clamped)
         audio.updateVolume(clamped, rampDuration: 0.25)
         settings.lastVolume = clamped
         store.save(settings)
@@ -222,6 +226,19 @@ final class HomeViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        systemVolume.volumePublisher
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] systemValue in
+                guard let self else { return }
+                let clamped = safetyPolicy.clamped(volume: systemValue)
+                volume = clamped
+                audio.updateVolume(clamped, rampDuration: 0.1)
+                settings.lastVolume = clamped
+                store.save(settings)
+            }
+            .store(in: &cancellables)
     }
 
     private static func formatAsMinutesAndSeconds(_ seconds: TimeInterval) -> String {
@@ -292,4 +309,10 @@ final class HomeViewModel: ObservableObject {
             }
         }
     }
+}
+
+private final class NoOpSystemVolumeController: SystemVolumeControlling {
+    var volumePublisher: AnyPublisher<Float, Never> { Empty().eraseToAnyPublisher() }
+    var currentVolume: Float { 0.35 }
+    func setSystemVolume(_ value: Float) {}
 }

@@ -24,6 +24,7 @@ struct AppEnvironment {
                         )
                     )
                 ),
+                systemVolume: SystemVolumeService(),
                 safetyPolicy: NoiseSafetyPolicy(
                     maxGainCap: settings.noiseProtection.maxGainCap,
                     warningThreshold: settings.noiseProtection.warningThreshold
