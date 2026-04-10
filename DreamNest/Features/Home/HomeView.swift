@@ -175,18 +175,34 @@ struct HomeView: View {
 
         if prominent {
             Button {
+                if suppressNextPresetTap == preset {
+                    suppressNextPresetTap = nil
+                    return
+                }
                 Task { await viewModel.startPreset(preset) }
             } label: {
                 label
             }
             .buttonStyle(BorderedProminentButtonStyle())
+            .onLongPressGesture(minimumDuration: 0.5) {
+                suppressNextPresetTap = preset
+                selectedPresetForQuickControls = preset
+            }
         } else {
             Button {
+                if suppressNextPresetTap == preset {
+                    suppressNextPresetTap = nil
+                    return
+                }
                 Task { await viewModel.startPreset(preset) }
             } label: {
                 label
             }
             .buttonStyle(BorderedButtonStyle())
+            .onLongPressGesture(minimumDuration: 0.5) {
+                suppressNextPresetTap = preset
+                selectedPresetForQuickControls = preset
+            }
         }
     }
 
