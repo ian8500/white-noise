@@ -64,12 +64,12 @@ struct HomeView: View {
     private var presetButtons: some View {
         HStack(spacing: 8) {
             Button("Start Nap") {
-                Task { await viewModel.startPreset(.nap) }
+                Task { await viewModel.startPreset(PlaybackPreset.nap) }
             }
             .buttonStyle(.bordered)
 
             Button("Start Bedtime") {
-                Task { await viewModel.startPreset(.bedtime) }
+                Task { await viewModel.startPreset(PlaybackPreset.bedtime) }
             }
             .buttonStyle(.borderedProminent)
         }
@@ -397,9 +397,9 @@ private struct ChipButton: View {
         timer: SleepTimerEngine(),
         store: PreviewSettingsStore(),
         cryService: PreviewCryService(),
+        playbackSessionStore: UserDefaultsPlaybackSessionStore(defaults: .standard),
         safetyPolicy: .init(),
-        cryResponseCoordinator: CryResponseCoordinator(),
-        playbackSessionStore: UserDefaultsPlaybackSessionStore(defaults: .standard)
+        cryResponseCoordinator: CryResponseCoordinator()
     ))
 }
 
