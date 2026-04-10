@@ -30,6 +30,10 @@ final class HomeViewModel: ObservableObject {
     private let safetyPolicy: NoiseSafetyPolicy
     private let cryResponseCoordinator: CryResponseCoordinator
     private var cancellables = Set<AnyCancellable>()
+    private var playbackTask: Task<Void, Never>?
+    private var cryMonitoringTask: Task<Void, Never>?
+    private var playbackGeneration: Int = 0
+    private var wasTimerRunning = false
 
     init(
         catalogService: SoundCatalogProviding,
@@ -64,25 +68,27 @@ final class HomeViewModel: ObservableObject {
         startCryMonitoringIfNeeded()
     }
 
+    deinit {
+        playbackTask?.cancel()
+        cryMonitoringTask?.cancel()
+    }
+
     func quickStart() {
-        Task {
-            do {
-                try audio.configureSession(micModeEnabled: cryModeEnabled)
-                try await audio.play(sound: selectedSound, volume: safetyPolicy.clamped(volume: volume))
-                timer.start(duration: settings.timer.duration, fadeDuration: settings.timer.fadeDuration)
-                isPlaying = true
-            } catch {
-                isPlaying = false
-                warningBanner = "Playback failed: \(error.localizedDescription)"
-                homeLogger.error("quickStart failed: \(error.localizedDescription, privacy: .public)")
-            }
-        }
+        startPlaybackSession(
+            sound: selectedSound,
+            micModeEnabled: cryModeEnabled,
+            duration: settings.timer.duration,
+            failurePrefix: "Playback failed"
+        )
     }
 
     func stopPlayback() {
+        playbackTask?.cancel()
+        let generation = advancePlaybackGeneration()
         timer.cancel()
         Task {
             await audio.stop(fadeDuration: 0.3)
+            guard generation == playbackGeneration else { return }
             isPlaying = false
         }
     }
@@ -170,7 +176,9 @@ final class HomeViewModel: ObservableObject {
         settings.cryResponse.enabled = enabled
         store.save(settings)
 
-        Task {
+        cryMonitoringTask?.cancel()
+        cryMonitoringTask = Task { [weak self] in
+            guard let self else { return }
             if enabled {
                 await requestPermissionAndStartCryService()
             } else {
@@ -193,9 +201,16 @@ final class HomeViewModel: ObservableObject {
             .sink { [weak self] state in
                 guard let self else { return }
                 timerRemaining = state.remaining
-                if !state.isRunning {
+                let didTimerComplete = wasTimerRunning && !state.isRunning
+                wasTimerRunning = state.isRunning
+
+                if didTimerComplete {
+                    let generation = advancePlaybackGeneration()
                     isPlaying = false
-                    Task { await self.audio.stop(fadeDuration: 0.3) }
+                    Task {
+                        await self.audio.stop(fadeDuration: 0.3)
+                        guard generation == self.playbackGeneration else { return }
+                    }
                 }
 
                 let fadeGain = FadeCurve.gain(remaining: state.remaining, fadeDuration: state.fadeDuration)
@@ -272,7 +287,10 @@ final class HomeViewModel: ObservableObject {
 
     private func startCryMonitoringIfNeeded() {
         guard settings.cryResponse.enabled else { return }
-        Task { await requestPermissionAndStartCryService() }
+        cryMonitoringTask?.cancel()
+        cryMonitoringTask = Task { [weak self] in
+            await self?.requestPermissionAndStartCryService()
+        }
     }
 
     private func requestPermissionAndStartCryService() async {
@@ -299,18 +317,44 @@ final class HomeViewModel: ObservableObject {
 
     private func startCryTriggeredPlayback() {
         let targetSound = catalog.first(where: { $0.id == Self.cryTriggeredSoundID }) ?? selectedSound
+        startPlaybackSession(
+            sound: targetSound,
+            micModeEnabled: true,
+            duration: Self.cryTriggeredPlaybackDuration,
+            failurePrefix: "Cry response playback failed"
+        )
+    }
 
-        Task {
+    private func startPlaybackSession(
+        sound: SoundDefinition,
+        micModeEnabled: Bool,
+        duration: TimeInterval,
+        failurePrefix: String
+    ) {
+        playbackTask?.cancel()
+        let generation = advancePlaybackGeneration()
+        playbackTask = Task { [weak self] in
+            guard let self else { return }
             do {
-                try audio.configureSession(micModeEnabled: true)
-                try await audio.play(sound: targetSound, volume: safetyPolicy.clamped(volume: volume))
-                timer.start(duration: Self.cryTriggeredPlaybackDuration, fadeDuration: settings.timer.fadeDuration)
+                try audio.configureSession(micModeEnabled: micModeEnabled)
+                try await audio.play(sound: sound, volume: safetyPolicy.clamped(volume: volume))
+                guard !Task.isCancelled, generation == playbackGeneration else { return }
+                timer.start(duration: duration, fadeDuration: settings.timer.fadeDuration)
+                wasTimerRunning = true
                 isPlaying = true
             } catch {
+                guard !Task.isCancelled, generation == playbackGeneration else { return }
                 isPlaying = false
-                warningBanner = "Cry response playback failed: \(error.localizedDescription)"
+                warningBanner = "\(failurePrefix): \(error.localizedDescription)"
+                homeLogger.error("\(failurePrefix, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
         }
+    }
+
+    @discardableResult
+    private func advancePlaybackGeneration() -> Int {
+        playbackGeneration += 1
+        return playbackGeneration
     }
 }
 
