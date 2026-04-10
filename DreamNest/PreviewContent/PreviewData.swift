@@ -4,7 +4,7 @@ enum PreviewData {
     static let sampleSettings = AppSettings(
         lastSoundID: "pink-noise",
         lastVolume: 0.4,
-        timer: .init(duration: 45 * 60, fadeDuration: 60),
+        timer: .init(duration: 30 * 60, fadeDuration: 60),
         cryResponse: .init(enabled: true, volumeBoostStep: 0.06, timerExtension: 8 * 60, cooldown: 120),
         premium: .init(unlockedSoundIDs: ["white-noise", "pink-noise"]),
         noiseProtection: .init(enabled: true, maxGainCap: 0.72, warningThreshold: 0.68)

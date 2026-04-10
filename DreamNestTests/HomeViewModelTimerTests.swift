@@ -4,6 +4,10 @@ import XCTest
 
 @MainActor
 final class HomeViewModelTimerTests: XCTestCase {
+    func testDefaultTimerDurationIsThirtyMinutes() {
+        XCTAssertEqual(AppSettings().timer.duration, 30 * 60, accuracy: 0.001)
+    }
+
     func testApplyTimerPresetWhilePlayingExtendsTimerToPresetDuration() {
         let timer = TimerSpy()
         let viewModel = makeViewModel(timer: timer)
@@ -72,6 +76,29 @@ final class HomeViewModelTimerTests: XCTestCase {
         XCTAssertEqual(store.settings.timer.duration, 20 * 60, accuracy: 0.001)
     }
 
+    func testSelectSoundWhilePlayingSwitchesAudioImmediately() async {
+        let timer = TimerSpy()
+        let audio = AudioStub()
+        let store = StoreStub()
+        let viewModel = HomeViewModel(
+            catalogService: SoundCatalogService(sounds: SoundDefinition.seededCatalog),
+            audio: audio,
+            timer: timer,
+            store: store,
+            cryService: CryStub(),
+            safetyPolicy: .init(),
+            cryResponseCoordinator: .init(),
+            playbackSessionStore: PlaybackSessionStoreStub()
+        )
+        let rain = SoundDefinition.seededCatalog.first(where: { $0.id == "rain" })!
+        viewModel.isPlaying = true
+
+        viewModel.selectSound(rain)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(audio.playCalls.last?.soundID, rain.id)
+    }
+
     private func makeViewModel(timer: TimerSpy) -> HomeViewModel {
         HomeViewModel(
             catalogService: CatalogStub(),
@@ -98,9 +125,16 @@ private final class AudioStub: AudioPlaybackControlling {
     var playbackStatePublisher: AnyPublisher<AudioPlaybackState, Never> {
         Just(.idle).eraseToAnyPublisher()
     }
+    struct PlayCall {
+        let soundID: String
+        let volume: Float
+    }
+    private(set) var playCalls: [PlayCall] = []
 
     func configureSession(micModeEnabled: Bool) throws {}
-    func play(sound: SoundDefinition, volume: Float) async throws {}
+    func play(sound: SoundDefinition, volume: Float) async throws {
+        playCalls.append(.init(soundID: sound.id, volume: volume))
+    }
     func pause() {}
     func resume() {}
     func updateVolume(_ volume: Float, rampDuration: TimeInterval) {}

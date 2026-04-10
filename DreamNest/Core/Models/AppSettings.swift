@@ -4,7 +4,7 @@ public struct TimerSettings: Codable, Equatable, Sendable {
     public var duration: TimeInterval
     public var fadeDuration: TimeInterval
 
-    public init(duration: TimeInterval = 45 * 60, fadeDuration: TimeInterval = 60) {
+    public init(duration: TimeInterval = 30 * 60, fadeDuration: TimeInterval = 60) {
         self.duration = duration
         self.fadeDuration = fadeDuration
     }
@@ -120,8 +120,8 @@ public struct RoutinePreset: Codable, Equatable, Identifiable, Sendable {
     public static func seededDefaults(using settings: AppSettings) -> [RoutinePreset] {
         [
             .init(name: "Nap", soundID: settings.lastSoundID, volume: settings.lastVolume, timerDuration: 30 * 60, cryModeEnabled: false),
-            .init(name: "Bedtime", soundID: settings.lastSoundID, volume: settings.lastVolume, timerDuration: 60 * 60, cryModeEnabled: settings.cryResponse.enabled),
-            .init(name: "Night Rescue", soundID: "white-noise", volume: min(0.55, max(settings.lastVolume, 0.4)), timerDuration: 15 * 60, cryModeEnabled: true)
+            .init(name: "Bedtime", soundID: settings.lastSoundID, volume: settings.lastVolume, timerDuration: 30 * 60, cryModeEnabled: settings.cryResponse.enabled),
+            .init(name: "Night Rescue", soundID: "white-noise", volume: min(0.55, max(settings.lastVolume, 0.4)), timerDuration: 30 * 60, cryModeEnabled: true)
         ]
     }
 }
