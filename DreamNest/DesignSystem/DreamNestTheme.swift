@@ -8,6 +8,8 @@ enum DreamNestTheme {
     )
 
     static let cardBackground = Color.white.opacity(0.07)
+    static let modalBackground = Color(red: 0.10, green: 0.11, blue: 0.19)
+    static let elevatedControlBackground = Color(red: 0.15, green: 0.16, blue: 0.26)
     static let primaryText = Color.white
     static let secondaryText = Color.white.opacity(0.75)
     static let accent = Color(red: 0.62, green: 0.58, blue: 0.98)
