@@ -43,4 +43,22 @@ final class CryResponseCoordinatorTests: XCTestCase {
 
         XCTAssertNil(second)
     }
+
+    func testCooldownRemainingExpires() {
+        let coordinator = CryResponseCoordinator()
+        let settings = CryResponseSettings(enabled: true, volumeBoostStep: 0.1, timerExtension: 120, cooldown: 60)
+        let start = Date(timeIntervalSince1970: 1_000)
+
+        _ = coordinator.handle(
+            signal: .init(detected: true, confidence: 0.9, date: start),
+            isEnabled: true,
+            settings: settings,
+            currentVolume: 0.4,
+            safetyPolicy: NoiseSafetyPolicy(maxGainCap: 0.75)
+        )
+
+        XCTAssertEqual(coordinator.cooldownRemaining(at: start.addingTimeInterval(20), settings: settings), 40, accuracy: 0.001)
+        XCTAssertEqual(coordinator.cooldownRemaining(at: start.addingTimeInterval(80), settings: settings), 0, accuracy: 0.001)
+        XCTAssertFalse(coordinator.isInCooldown(at: start.addingTimeInterval(80), settings: settings))
+    }
 }

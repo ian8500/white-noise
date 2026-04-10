@@ -16,8 +16,16 @@ final class HomeViewModel: ObservableObject {
     @Published var warningBanner: String?
     @Published var cryModeEnabled: Bool
     @Published var cryDetectionThreshold: Float
+    @Published private(set) var isCryMonitoringActive = false
+    @Published private(set) var lastCryDetectionTime: Date?
+    @Published private(set) var lastCryConfidence: Float?
+    @Published private(set) var lastCryActionSummary = "No cry events yet"
+    @Published private(set) var cryCooldownRemaining: TimeInterval = 0
+    @Published private(set) var recentCryEvents: [CryEventRow] = []
     @Published private(set) var favoriteSoundIDs: Set<String>
     @Published private(set) var recentSoundIDs: [String]
+    @Published private(set) var routinePresets: [RoutinePreset]
+    @Published private(set) var defaultRoutinePresetID: UUID?
 
     let catalog: [SoundDefinition]
 
@@ -29,6 +37,7 @@ final class HomeViewModel: ObservableObject {
     private let systemVolume: SystemVolumeControlling
     private let safetyPolicy: NoiseSafetyPolicy
     private let cryResponseCoordinator: CryResponseCoordinator
+    private let dateProvider: () -> Date
     private var cancellables = Set<AnyCancellable>()
     private var playbackTask: Task<Void, Never>?
     private var cryMonitoringTask: Task<Void, Never>?
@@ -43,7 +52,8 @@ final class HomeViewModel: ObservableObject {
         cryService: CryDetectionControlling,
         systemVolume: SystemVolumeControlling? = nil,
         safetyPolicy: NoiseSafetyPolicy,
-        cryResponseCoordinator: CryResponseCoordinator
+        cryResponseCoordinator: CryResponseCoordinator,
+        dateProvider: @escaping () -> Date = Date.init
     ) {
         self.catalog = catalogService.sounds
         self.audio = audio
@@ -53,6 +63,7 @@ final class HomeViewModel: ObservableObject {
         self.systemVolume = systemVolume ?? NoOpSystemVolumeController()
         self.safetyPolicy = safetyPolicy
         self.cryResponseCoordinator = cryResponseCoordinator
+        self.dateProvider = dateProvider
 
         settings = store.load()
         selectedSound = catalogService.sound(id: settings.lastSoundID) ?? catalogService.sounds[0]
@@ -61,11 +72,22 @@ final class HomeViewModel: ObservableObject {
         cryDetectionThreshold = settings.cryResponse.detectionThreshold
         favoriteSoundIDs = settings.favoriteSoundIDs
         recentSoundIDs = settings.recentSoundIDs
+        recentCryEvents = store.loadCryEvents(limit: 12).map(CryEventRow.init)
+
+        if settings.routinePresets.isEmpty {
+            settings.routinePresets = RoutinePreset.seededDefaults(using: settings)
+            settings.defaultRoutinePresetID = settings.routinePresets.first?.id
+            store.save(settings)
+        }
+
+        routinePresets = settings.routinePresets
+        defaultRoutinePresetID = settings.defaultRoutinePresetID
 
         bind()
         cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
         cryService.updateCooldown(settings.cryResponse.cooldown)
         startCryMonitoringIfNeeded()
+        refreshCooldownState()
     }
 
     deinit {
@@ -74,23 +96,94 @@ final class HomeViewModel: ObservableObject {
     }
 
     func quickStart() {
-        startPlaybackSession(
-            sound: selectedSound,
-            micModeEnabled: cryModeEnabled,
-            duration: settings.timer.duration,
-            failurePrefix: "Playback failed"
+        startRoutine(sound: selectedSound, volume: volume, timerDuration: settings.timer.duration, cryModeEnabled: cryModeEnabled)
+    }
+
+    func startDefaultRoutine() {
+        guard let preset = defaultRoutinePreset else {
+            quickStart()
+            return
+        }
+        startRoutine(preset: preset)
+    }
+
+
+    var defaultRoutinePreset: RoutinePreset? {
+        guard let defaultRoutinePresetID else { return nil }
+        return routinePresets.first(where: { $0.id == defaultRoutinePresetID })
+    }
+
+    func startRoutine(preset: RoutinePreset) {
+        applyPreset(preset)
+        startRoutine(sound: selectedSound, volume: volume, timerDuration: settings.timer.duration, cryModeEnabled: cryModeEnabled)
+    }
+
+    func saveCurrentAsPreset(named name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let preset = RoutinePreset(
+            name: trimmed,
+            soundID: selectedSound.id,
+            volume: volume,
+            timerDuration: settings.timer.duration,
+            cryModeEnabled: cryModeEnabled
         )
+        settings.routinePresets.append(preset)
+        if settings.defaultRoutinePresetID == nil {
+            settings.defaultRoutinePresetID = preset.id
+        }
+        syncRoutineSettings()
+    }
+
+    func renamePreset(id: UUID, name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let index = settings.routinePresets.firstIndex(where: { $0.id == id })
+        else { return }
+        settings.routinePresets[index].name = trimmed
+        syncRoutineSettings()
+    }
+
+    func movePresets(from source: IndexSet, to destination: Int) {
+        let moving = source.sorted().map { settings.routinePresets[$0] }
+        for index in source.sorted(by: >) {
+            settings.routinePresets.remove(at: index)
+        }
+        var insertAt = destination
+        for index in source where index < destination {
+            insertAt -= 1
+        }
+        settings.routinePresets.insert(contentsOf: moving, at: max(0, min(insertAt, settings.routinePresets.count)))
+        syncRoutineSettings()
+    }
+
+    func setDefaultPreset(id: UUID) {
+        guard settings.routinePresets.contains(where: { $0.id == id }) else { return }
+        settings.defaultRoutinePresetID = id
+        syncRoutineSettings()
+    }
+
+    func applyPreset(_ preset: RoutinePreset) {
+        guard catalog.contains(where: { $0.id == preset.soundID }) else { return }
+        if let sound = catalog.first(where: { $0.id == preset.soundID }) {
+            selectSound(sound)
+        }
+        setVolume(preset.volume)
+        settings.timer.duration = preset.timerDuration
+        toggleCryMode(preset.cryModeEnabled)
+        store.save(settings)
     }
 
     func stopPlayback() {
-        playbackTask?.cancel()
-        let generation = advancePlaybackGeneration()
+        Task { await stopPlaybackFromAutomation() }
+    }
+
+    func stopPlaybackFromAutomation() async {
         timer.cancel()
-        Task {
-            await audio.stop(fadeDuration: 0.3)
-            guard generation == playbackGeneration else { return }
-            isPlaying = false
-        }
+        playbackSessionStore.clear()
+        await audio.stop(fadeDuration: 0.3)
+        isPlaying = false
     }
 
     func setVolume(_ value: Float) {
@@ -103,6 +196,7 @@ final class HomeViewModel: ObservableObject {
         audio.updateVolume(clamped, rampDuration: 0.25)
         settings.lastVolume = clamped
         store.save(settings)
+        persistPlaybackSnapshotIfNeeded()
     }
 
     func selectSound(_ sound: SoundDefinition) {
@@ -171,6 +265,17 @@ final class HomeViewModel: ObservableObject {
         return "Starts from \(formattedTimerDuration) when you begin a sleep session."
     }
 
+    var cryMonitoringStatusLabel: String {
+        if !cryModeEnabled { return "Off" }
+        return isCryMonitoringActive ? "On" : "Unavailable"
+    }
+
+    var cryCooldownStatusLabel: String {
+        guard cryModeEnabled else { return "Monitoring off" }
+        if cryCooldownRemaining <= 0 { return "Ready" }
+        return "Cooling down (\(Int(cryCooldownRemaining.rounded(.up)))s)"
+    }
+
     func toggleCryMode(_ enabled: Bool) {
         cryModeEnabled = enabled
         settings.cryResponse.enabled = enabled
@@ -183,6 +288,8 @@ final class HomeViewModel: ObservableObject {
                 await requestPermissionAndStartCryService()
             } else {
                 cryService.stop()
+                isCryMonitoringActive = false
+                lastCryActionSummary = "Monitoring turned off"
             }
         }
     }
@@ -193,6 +300,27 @@ final class HomeViewModel: ObservableObject {
         settings.cryResponse.detectionThreshold = clamped
         cryService.updateDetectionThreshold(clamped)
         store.save(settings)
+    }
+
+    private func syncRoutineSettings() {
+        routinePresets = settings.routinePresets
+        defaultRoutinePresetID = settings.defaultRoutinePresetID
+        store.save(settings)
+    }
+
+    private func startRoutine(sound: SoundDefinition, volume: Float, timerDuration: TimeInterval, cryModeEnabled: Bool) {
+        Task {
+            do {
+                try audio.configureSession(micModeEnabled: cryModeEnabled)
+                try await audio.play(sound: sound, volume: safetyPolicy.clamped(volume: volume))
+                timer.start(duration: timerDuration, fadeDuration: settings.timer.fadeDuration)
+                isPlaying = true
+            } catch {
+                isPlaying = false
+                warningBanner = "Playback failed: \(error.localizedDescription)"
+                homeLogger.error("quickStart failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     private func bind() {
@@ -207,15 +335,14 @@ final class HomeViewModel: ObservableObject {
                 if didTimerComplete {
                     let generation = advancePlaybackGeneration()
                     isPlaying = false
-                    Task {
-                        await self.audio.stop(fadeDuration: 0.3)
-                        guard generation == self.playbackGeneration else { return }
-                    }
+                    playbackSessionStore.clear()
+                    Task { await self.audio.stop(fadeDuration: 0.3) }
                 }
 
                 let fadeGain = FadeCurve.gain(remaining: state.remaining, fadeDuration: state.fadeDuration)
                 if state.isRunning {
                     audio.updateVolume(volume * fadeGain, rampDuration: 0.5)
+                    persistPlaybackSnapshotIfNeeded()
                 }
             }
             .store(in: &cancellables)
@@ -233,15 +360,25 @@ final class HomeViewModel: ObservableObject {
                       )
                 else { return }
 
+                lastCryDetectionTime = signal.date
+                lastCryConfidence = signal.confidence
+                var actions: [CryDetectionEvent.Action] = [.increasedVolume]
+
                 setVolume(action.targetVolume)
                 if isPlaying {
                     timer.extend(by: action.timerExtension)
+                    actions.append(.extendedTimer)
+                    lastCryActionSummary = "Increased volume and extended timer"
                 } else {
                     startCryTriggeredPlayback()
+                    actions.append(.startedPlayback)
+                    lastCryActionSummary = "Started playback and increased volume"
                 }
                 if action.shouldRecordEvent {
-                    store.appendCryEvent(.init(confidence: signal.confidence))
+                    store.appendCryEvent(.init(timestamp: signal.date, confidence: signal.confidence, actions: actions))
+                    recentCryEvents = store.loadCryEvents(limit: 12).map(CryEventRow.init)
                 }
+                refreshCooldownState()
             }
             .store(in: &cancellables)
 
@@ -255,6 +392,13 @@ final class HomeViewModel: ObservableObject {
                 audio.updateVolume(clamped, rampDuration: 0.1)
                 settings.lastVolume = clamped
                 store.save(settings)
+            }
+            .store(in: &cancellables)
+
+        Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.refreshCooldownState()
             }
             .store(in: &cancellables)
     }
@@ -298,7 +442,8 @@ final class HomeViewModel: ObservableObject {
         guard granted else {
             cryModeEnabled = false
             settings.cryResponse.enabled = false
-            warningBanner = "Microphone permission is required for cry response mode."
+            isCryMonitoringActive = false
+            warningBanner = "Microphone access is off. Enable it in Settings > Privacy & Security > Microphone to use Cry Response Mode."
             store.save(settings)
             return
         }
@@ -307,23 +452,67 @@ final class HomeViewModel: ObservableObject {
             cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
             cryService.updateCooldown(settings.cryResponse.cooldown)
             try cryService.start()
+            isCryMonitoringActive = true
+            lastCryActionSummary = "Monitoring and waiting for cry patterns"
         } catch {
             cryModeEnabled = false
             settings.cryResponse.enabled = false
-            warningBanner = "Unable to start cry detection: \(error.localizedDescription)"
+            isCryMonitoringActive = false
+            warningBanner = "Cry monitoring couldn’t start. Confirm microphone availability and try again. Error: \(error.localizedDescription)"
             store.save(settings)
         }
     }
 
     private func startCryTriggeredPlayback() {
         let targetSound = catalog.first(where: { $0.id == Self.cryTriggeredSoundID }) ?? selectedSound
-        startPlaybackSession(
-            sound: targetSound,
-            micModeEnabled: true,
-            duration: Self.cryTriggeredPlaybackDuration,
-            failurePrefix: "Cry response playback failed"
-        )
+        Task {
+            await startPlayback(
+                sound: targetSound,
+                duration: Self.cryTriggeredPlaybackDuration,
+                micModeEnabled: true
+            )
+        }
     }
+
+    private func startPlayback(sound: SoundDefinition, duration: TimeInterval, micModeEnabled: Bool) async {
+        do {
+            try audio.configureSession(micModeEnabled: micModeEnabled)
+            try await audio.play(sound: sound, volume: safetyPolicy.clamped(volume: volume))
+            timer.start(duration: duration, fadeDuration: settings.timer.fadeDuration)
+            isPlaying = true
+            persistPlaybackSnapshotIfNeeded()
+        } catch {
+            isPlaying = false
+            warningBanner = "Playback failed: \(error.localizedDescription)"
+            homeLogger.error("playback failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func persistPlaybackSnapshotIfNeeded() {
+        guard isPlaying, timerRemaining > 0 else { return }
+
+        let snapshot = PlaybackSessionSnapshot(
+            soundID: selectedSound.id,
+            targetVolume: safetyPolicy.clamped(volume: volume),
+            expectedEndDate: Date().addingTimeInterval(timerRemaining),
+            micModeEnabled: cryModeEnabled
+        )
+        playbackSessionStore.save(snapshot)
+    }
+
+    private func restorePlaybackSessionIfNeeded() {
+        guard let snapshot = playbackSessionStore.load() else { return }
+        guard snapshot.isStillActive else {
+            playbackSessionStore.clear()
+            return
+        }
+        guard let sound = catalog.first(where: { $0.id == snapshot.soundID }) else {
+            playbackSessionStore.clear()
+            return
+        }
+
+        selectedSound = sound
+        volume = safetyPolicy.clamped(volume: snapshot.targetVolume)
 
     private func startPlaybackSession(
         sound: SoundDefinition,
@@ -336,25 +525,55 @@ final class HomeViewModel: ObservableObject {
         playbackTask = Task { [weak self] in
             guard let self else { return }
             do {
-                try audio.configureSession(micModeEnabled: micModeEnabled)
-                try await audio.play(sound: sound, volume: safetyPolicy.clamped(volume: volume))
-                guard !Task.isCancelled, generation == playbackGeneration else { return }
-                timer.start(duration: duration, fadeDuration: settings.timer.fadeDuration)
-                wasTimerRunning = true
+                try audio.configureSession(micModeEnabled: snapshot.micModeEnabled)
+                try await audio.play(sound: sound, volume: volume)
+                timer.start(duration: snapshot.remainingDuration, fadeDuration: settings.timer.fadeDuration)
                 isPlaying = true
             } catch {
                 guard !Task.isCancelled, generation == playbackGeneration else { return }
                 isPlaying = false
-                warningBanner = "\(failurePrefix): \(error.localizedDescription)"
-                homeLogger.error("\(failurePrefix, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                warningBanner = "Cry detected, but audio couldn’t start. Check output route and try again. Error: \(error.localizedDescription)"
+                lastCryActionSummary = "Cry detected but playback start failed"
             }
         }
     }
 
-    @discardableResult
-    private func advancePlaybackGeneration() -> Int {
-        playbackGeneration += 1
-        return playbackGeneration
+    private func refreshCooldownState() {
+        cryCooldownRemaining = cryResponseCoordinator.cooldownRemaining(
+            at: dateProvider(),
+            settings: settings.cryResponse
+        )
+    }
+}
+
+extension HomeViewModel {
+    struct CryEventRow: Identifiable, Equatable {
+        let id: UUID
+        let timestamp: Date
+        let confidence: Float
+        let actionDescription: String
+
+        init(event: CryDetectionEvent) {
+            id = event.id
+            timestamp = event.timestamp
+            confidence = event.confidence
+            actionDescription = event.actions.isEmpty
+                ? "Action recorded"
+                : event.actions.map(\.label).joined(separator: " • ")
+        }
+    }
+}
+
+private extension CryDetectionEvent.Action {
+    var label: String {
+        switch self {
+        case .startedPlayback:
+            return "Started playback"
+        case .increasedVolume:
+            return "Increased volume"
+        case .extendedTimer:
+            return "Extended timer"
+        }
     }
 }
 

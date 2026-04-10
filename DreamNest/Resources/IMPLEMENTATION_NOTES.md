@@ -32,3 +32,19 @@
 5. Move persistence to SwiftData/CoreData if event history grows.
 6. Add analytics only after privacy review and explicit opt-in.
 7. Add XCTest UI snapshots for dark-mode accessibility validation.
+
+## Platform automation scaffolding (April 2026)
+
+This repository now includes code scaffolding for:
+- App Intents + Siri/App Shortcuts (`Start Nap`, `Start Bedtime`, `Stop Playback`)
+- Interactive Widget UI intended for Home Screen + Lock Screen launch actions
+- Playback session snapshots for restoration after relaunch
+
+### Manual Xcode configuration still required
+1. **Add widget extension target** and move `DreamNest/App/DreamNestWidgets.swift` into that target's membership.
+2. **Enable App Intents discovery** by confirming the app target embeds `PlaybackAppIntents.swift` and rebuilding so shortcuts are indexed.
+3. **App Group (recommended for widget->app shared state)**:
+   - Add an App Group capability to app + widget targets (for example `group.com.yourcompany.dreamnest`).
+   - Update persistence stores to use `UserDefaults(suiteName:)` for shared reads/writes.
+4. **Background modes**: keep `audio` background mode enabled for reliable lock-screen control behavior.
+5. **If choosing Live Activities later**: add ActivityKit entitlement and push settings, then layer a `PlaybackActivityController` on top of the same session snapshot model.

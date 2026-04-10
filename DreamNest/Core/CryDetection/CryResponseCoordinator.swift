@@ -39,4 +39,14 @@ public final class CryResponseCoordinator {
             shouldRecordEvent: true
         )
     }
+
+    public func cooldownRemaining(at date: Date = Date(), settings: CryResponseSettings) -> TimeInterval {
+        guard let lastResponseDate else { return 0 }
+        let elapsed = date.timeIntervalSince(lastResponseDate)
+        return max(0, settings.cooldown - elapsed)
+    }
+
+    public func isInCooldown(at date: Date = Date(), settings: CryResponseSettings) -> Bool {
+        cooldownRemaining(at: date, settings: settings) > 0
+    }
 }
