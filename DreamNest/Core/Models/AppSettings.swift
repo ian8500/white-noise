@@ -64,6 +64,39 @@ public struct PremiumState: Codable, Equatable, Sendable {
     }
 }
 
+public struct RoutinePreset: Codable, Equatable, Identifiable, Sendable {
+    public let id: UUID
+    public var name: String
+    public var soundID: String
+    public var volume: Float
+    public var timerDuration: TimeInterval
+    public var cryModeEnabled: Bool
+
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        soundID: String,
+        volume: Float,
+        timerDuration: TimeInterval,
+        cryModeEnabled: Bool
+    ) {
+        self.id = id
+        self.name = name
+        self.soundID = soundID
+        self.volume = max(0, min(volume, 1.0))
+        self.timerDuration = max(60, timerDuration)
+        self.cryModeEnabled = cryModeEnabled
+    }
+
+    public static func seededDefaults(using settings: AppSettings) -> [RoutinePreset] {
+        [
+            .init(name: "Nap", soundID: settings.lastSoundID, volume: settings.lastVolume, timerDuration: 30 * 60, cryModeEnabled: false),
+            .init(name: "Bedtime", soundID: settings.lastSoundID, volume: settings.lastVolume, timerDuration: 60 * 60, cryModeEnabled: settings.cryResponse.enabled),
+            .init(name: "Night Rescue", soundID: "white-noise", volume: min(0.55, max(settings.lastVolume, 0.4)), timerDuration: 15 * 60, cryModeEnabled: true)
+        ]
+    }
+}
+
 public struct AppSettings: Codable, Equatable, Sendable {
     public var lastSoundID: String
     public var lastVolume: Float
@@ -73,6 +106,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var cryResponse: CryResponseSettings
     public var premium: PremiumState
     public var noiseProtection: NoiseProtectionSettings
+    public var routinePresets: [RoutinePreset]
+    public var defaultRoutinePresetID: UUID?
 
     public init(
         lastSoundID: String = "white-noise",
@@ -82,7 +117,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         timer: TimerSettings = .init(),
         cryResponse: CryResponseSettings = .init(),
         premium: PremiumState = .init(),
-        noiseProtection: NoiseProtectionSettings = .init()
+        noiseProtection: NoiseProtectionSettings = .init(),
+        routinePresets: [RoutinePreset] = [],
+        defaultRoutinePresetID: UUID? = nil
     ) {
         self.lastSoundID = lastSoundID
         self.lastVolume = lastVolume
@@ -92,6 +129,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.cryResponse = cryResponse
         self.premium = premium
         self.noiseProtection = noiseProtection
+        self.routinePresets = routinePresets
+        self.defaultRoutinePresetID = defaultRoutinePresetID
     }
 
     enum CodingKeys: String, CodingKey {
@@ -103,6 +142,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case cryResponse
         case premium
         case noiseProtection
+        case routinePresets
+        case defaultRoutinePresetID
         case maxGainCap
     }
 
@@ -122,6 +163,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
             let legacyMax = try container.decodeIfPresent(Float.self, forKey: .maxGainCap) ?? 0.75
             noiseProtection = .init(maxGainCap: legacyMax)
         }
+
+        routinePresets = try container.decodeIfPresent([RoutinePreset].self, forKey: .routinePresets) ?? []
+        defaultRoutinePresetID = try container.decodeIfPresent(UUID.self, forKey: .defaultRoutinePresetID)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -134,17 +178,42 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try container.encode(cryResponse, forKey: .cryResponse)
         try container.encode(premium, forKey: .premium)
         try container.encode(noiseProtection, forKey: .noiseProtection)
+        try container.encode(routinePresets, forKey: .routinePresets)
+        try container.encodeIfPresent(defaultRoutinePresetID, forKey: .defaultRoutinePresetID)
     }
 }
 
 public struct CryDetectionEvent: Codable, Equatable, Sendable, Identifiable {
+    public enum Action: String, Codable, Equatable, Sendable, CaseIterable {
+        case startedPlayback
+        case increasedVolume
+        case extendedTimer
+    }
+
     public let id: UUID
     public let timestamp: Date
     public let confidence: Float
+    public let actions: [Action]
 
-    public init(id: UUID = UUID(), timestamp: Date = Date(), confidence: Float) {
+    public init(id: UUID = UUID(), timestamp: Date = Date(), confidence: Float, actions: [Action] = []) {
         self.id = id
         self.timestamp = timestamp
         self.confidence = confidence
+        self.actions = actions
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case timestamp
+        case confidence
+        case actions
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        timestamp = try container.decodeIfPresent(Date.self, forKey: .timestamp) ?? Date()
+        confidence = try container.decodeIfPresent(Float.self, forKey: .confidence) ?? 0
+        actions = try container.decodeIfPresent([Action].self, forKey: .actions) ?? []
     }
 }
