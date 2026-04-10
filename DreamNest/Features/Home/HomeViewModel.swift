@@ -256,6 +256,23 @@ final class HomeViewModel: ObservableObject {
         settings.recentSoundIDs = Array(settings.recentSoundIDs.prefix(5))
         recentSoundIDs = settings.recentSoundIDs
         store.save(settings)
+
+        guard isPlaying else { return }
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try self.audio.configureSession(micModeEnabled: self.cryModeEnabled)
+                try await self.audio.play(
+                    sound: sound,
+                    volume: self.safetyPolicy.clamped(volume: self.volume)
+                )
+                self.persistPlaybackSnapshotIfNeeded()
+            } catch {
+                self.warningBanner = "Couldn't switch sound: \(error.localizedDescription)"
+                homeLogger.error("sound switch failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     func toggleFavorite(_ sound: SoundDefinition) {
