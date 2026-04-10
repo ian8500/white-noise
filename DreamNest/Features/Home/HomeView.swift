@@ -18,10 +18,11 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     header
+                    timerHeroCard
                     quickStartButton
                     presetButtons
                     stopButton
-                    ExpandableSettingsCard(title: "Sleep Timer", isExpanded: $isTimerExpanded) {
+                    ExpandableSettingsCard(title: "Sleep Timer Controls", isExpanded: $isTimerExpanded) {
                         timerCardContent
                     }
                     ExpandableSettingsCard(title: "Volume", isExpanded: $isVolumeExpanded) {
@@ -80,6 +81,44 @@ struct HomeView: View {
         .accessibilityHint("Starts your default routine preset, or current settings if no default is set.")
     }
 
+    private var timerHeroCard: some View {
+        HStack(alignment: .center, spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(DreamNestTheme.accent.opacity(0.16))
+                    .frame(width: 52, height: 52)
+                Image(systemName: viewModel.isPlaying ? "timer.circle.fill" : "timer.circle")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(DreamNestTheme.accent)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(viewModel.timerCountdownTitle)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(DreamNestTheme.primaryText)
+                Text(viewModel.timerCountdownSubtitle)
+                    .font(.footnote)
+                    .foregroundStyle(DreamNestTheme.secondaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(DreamNestTheme.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(DreamNestTheme.accent.opacity(0.28), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Sleep timer status. \(viewModel.timerCountdownTitle). \(viewModel.timerCountdownSubtitle)")
+    }
+
 
     private var presetButtons: some View {
         HStack(spacing: 8) {
@@ -119,15 +158,9 @@ struct HomeView: View {
 
     private var timerCardContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(viewModel.timerCountdownTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(DreamNestTheme.primaryText)
-                Text(viewModel.timerCountdownSubtitle)
-                    .font(.footnote)
-                    .foregroundStyle(DreamNestTheme.secondaryText)
-            }
-            .padding(.vertical, 2)
+            Text("Adjust duration for your next playback session or while audio is running.")
+                .font(.footnote)
+                .foregroundStyle(DreamNestTheme.secondaryText)
 
             HStack {
                 timerPresetButton("60m", minutes: 60)
