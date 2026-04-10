@@ -29,6 +29,7 @@ public protocol SettingsStoring {
     func save(_ settings: AppSettings)
     func appendCryEvent(_ event: CryDetectionEvent)
     func loadCryEvents(limit: Int) -> [CryDetectionEvent]
+    func clearCryEvents()
 }
 
 public protocol SleepTimerScheduling: AnyObject {

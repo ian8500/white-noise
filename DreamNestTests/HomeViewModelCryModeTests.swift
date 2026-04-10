@@ -174,6 +174,7 @@ private final class StoreSpy: SettingsStoring {
     func save(_ settings: AppSettings) { self.settings = settings }
     func appendCryEvent(_ event: CryDetectionEvent) { cryEvents.append(event) }
     func loadCryEvents(limit: Int) -> [CryDetectionEvent] { Array(cryEvents.suffix(limit)) }
+    func clearCryEvents() { cryEvents.removeAll() }
 }
 
 private final class CryServiceSpy: CryDetectionControlling {
