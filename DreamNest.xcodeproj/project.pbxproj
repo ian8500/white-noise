@@ -17,6 +17,7 @@
 		2F4DA9741CA938CA7CBEA777 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3085EA22953F12064B56C358 /* AppSettings.swift */; };
 		000B95A54B32C87794B677BC /* SoundDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BEE2E490CE3074D70D998A8 /* SoundDefinition.swift */; };
 		4AE1EA2B35EC9BF98D77EC6E /* EQProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32D16194C1B20B3BF134063 /* EQProfile.swift */; };
+		AB12CD34EF56AB7890CD1234 /* PlaybackPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD34EF56AB7890CD1233 /* PlaybackPreset.swift */; };
 		C229F3D858765EEB0350C63C /* ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710ED2B75675CF6BC16D4200 /* ServiceProtocols.swift */; };
 		527B615A25DBA774DB83C3D4 /* NoiseSafetyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2084875C361E6FC1CD50C874 /* NoiseSafetyPolicy.swift */; };
 		50E1BF949EAE8315A9CEC0F1 /* UserDefaultsSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010C7028AB1AEDFFED94C93A /* UserDefaultsSettingsStore.swift */; };
@@ -52,6 +53,7 @@
 		3085EA22953F12064B56C358 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		3BEE2E490CE3074D70D998A8 /* SoundDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundDefinition.swift; sourceTree = "<group>"; };
 		A32D16194C1B20B3BF134063 /* EQProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EQProfile.swift; sourceTree = "<group>"; };
+		AB12CD34EF56AB7890CD1233 /* PlaybackPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackPreset.swift; sourceTree = "<group>"; };
 		710ED2B75675CF6BC16D4200 /* ServiceProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceProtocols.swift; sourceTree = "<group>"; };
 		2084875C361E6FC1CD50C874 /* NoiseSafetyPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoiseSafetyPolicy.swift; sourceTree = "<group>"; };
 		010C7028AB1AEDFFED94C93A /* UserDefaultsSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsSettingsStore.swift; sourceTree = "<group>"; };
@@ -131,6 +133,7 @@
 			3085EA22953F12064B56C358 /* AppSettings.swift */,
 			3BEE2E490CE3074D70D998A8 /* SoundDefinition.swift */,
 			A32D16194C1B20B3BF134063 /* EQProfile.swift */,
+			AB12CD34EF56AB7890CD1233 /* PlaybackPreset.swift */,
 		); path = Models; sourceTree = "<group>"; };
 		9EA0C8ACB10AC34B81D92BCB /* Persistence */ = {isa = PBXGroup; children = (
 			010C7028AB1AEDFFED94C93A /* UserDefaultsSettingsStore.swift */,
@@ -202,6 +205,7 @@
 			2F4DA9741CA938CA7CBEA777 /* in Sources */,
 			000B95A54B32C87794B677BC /* in Sources */,
 			4AE1EA2B35EC9BF98D77EC6E /* in Sources */,
+			AB12CD34EF56AB7890CD1234 /* in Sources */,
 			C229F3D858765EEB0350C63C /* in Sources */,
 			527B615A25DBA774DB83C3D4 /* in Sources */,
 			50E1BF949EAE8315A9CEC0F1 /* in Sources */,
