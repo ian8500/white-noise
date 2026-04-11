@@ -32,6 +32,7 @@ private struct SettingsView: View {
 
             ScrollView {
                 VStack(spacing: 16) {
+                    smartResettleCard
                     cryDetectionCard
                     cryAlertCard
                 }
@@ -65,6 +66,25 @@ private struct SettingsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
+    private var smartResettleCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Smart Resettle")
+                .foregroundStyle(DreamNestTheme.primaryText)
+                .font(.headline)
+
+            Text("After a Sleep or Nap session ends, DreamNest can keep listening for a short time and gently restart soothing audio if crying returns.")
+                .foregroundStyle(DreamNestTheme.secondaryText)
+                .font(.footnote)
+
+            Text("A convenience soothing feature designed to help your little one settle back down.")
+                .foregroundStyle(DreamNestTheme.secondaryText.opacity(0.9))
+                .font(.caption)
+        }
+        .padding()
+        .background(DreamNestTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
     private var cryAlertCard: some View {
         NavigationLink {
             CryDetectionAlertsView(viewModel: viewModel)
@@ -75,10 +95,10 @@ private struct SettingsView: View {
                     .foregroundStyle(DreamNestTheme.accent)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Cry Detection Alerts")
+                    Text("Smart Resettle History")
                         .font(.headline)
                         .foregroundStyle(DreamNestTheme.primaryText)
-                    Text("View history and clear alerts")
+                    Text("View cry and resettle events")
                         .font(.footnote)
                         .foregroundStyle(DreamNestTheme.secondaryText)
                 }
@@ -137,14 +157,14 @@ private struct CryDetectionAlertsView: View {
                 .scrollContentBackground(.hidden)
             }
         }
-        .navigationTitle("Cry Detection Alerts")
+        .navigationTitle("Smart Resettle Alerts")
         .alert("Clear all alerts?", isPresented: $showClearConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Clear All", role: .destructive) {
                 viewModel.clearCryEvents()
             }
         } message: {
-            Text("This will remove all cry detection alert history.")
+            Text("This will remove all Smart Resettle and cry alert history.")
         }
     }
 }
@@ -169,9 +189,15 @@ private struct CryAlertRow: View {
                 .foregroundStyle(DreamNestTheme.secondaryText)
                 .font(.footnote)
 
-            Text("Confidence \(Int((event.confidence * 100).rounded()))%")
+            Text(event.detailDescription)
                 .foregroundStyle(DreamNestTheme.secondaryText.opacity(0.75))
                 .font(.caption)
+
+            if event.confidence > 0 {
+                Text("Confidence \(Int((event.confidence * 100).rounded()))%")
+                    .foregroundStyle(DreamNestTheme.secondaryText.opacity(0.65))
+                    .font(.caption2)
+            }
         }
         .padding(.vertical, 4)
     }

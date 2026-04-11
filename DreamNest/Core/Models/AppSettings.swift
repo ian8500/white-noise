@@ -68,17 +68,37 @@ public struct QuickStartPresetSettings: Codable, Equatable, Sendable {
     public var duration: TimeInterval
     public var cryModeEnabled: Bool
     public var soundID: String?
+    public var smartResettleEnabled: Bool
+    public var listeningWindow: TimeInterval
+    public var resettleDuration: TimeInterval
+    public var maxAutoResettles: Int
 
-    public init(duration: TimeInterval, cryModeEnabled: Bool, soundID: String? = nil) {
+    public init(
+        duration: TimeInterval,
+        cryModeEnabled: Bool,
+        soundID: String? = nil,
+        smartResettleEnabled: Bool = false,
+        listeningWindow: TimeInterval = 30 * 60,
+        resettleDuration: TimeInterval = 5 * 60,
+        maxAutoResettles: Int = 2
+    ) {
         self.duration = max(60, duration)
         self.cryModeEnabled = cryModeEnabled
         self.soundID = soundID
+        self.smartResettleEnabled = smartResettleEnabled
+        self.listeningWindow = max(15 * 60, listeningWindow)
+        self.resettleDuration = max(3 * 60, resettleDuration)
+        self.maxAutoResettles = max(1, min(maxAutoResettles, 3))
     }
 
     enum CodingKeys: String, CodingKey {
         case duration
         case cryModeEnabled
         case soundID
+        case smartResettleEnabled
+        case listeningWindow
+        case resettleDuration
+        case maxAutoResettles
     }
 
     public init(from decoder: Decoder) throws {
@@ -86,6 +106,10 @@ public struct QuickStartPresetSettings: Codable, Equatable, Sendable {
         duration = max(60, try container.decodeIfPresent(TimeInterval.self, forKey: .duration) ?? 60)
         cryModeEnabled = try container.decodeIfPresent(Bool.self, forKey: .cryModeEnabled) ?? false
         soundID = try container.decodeIfPresent(String.self, forKey: .soundID)
+        smartResettleEnabled = try container.decodeIfPresent(Bool.self, forKey: .smartResettleEnabled) ?? false
+        listeningWindow = max(15 * 60, try container.decodeIfPresent(TimeInterval.self, forKey: .listeningWindow) ?? 30 * 60)
+        resettleDuration = max(3 * 60, try container.decodeIfPresent(TimeInterval.self, forKey: .resettleDuration) ?? 5 * 60)
+        maxAutoResettles = max(1, min(try container.decodeIfPresent(Int.self, forKey: .maxAutoResettles) ?? 2, 3))
     }
 
     public static func `default`(for preset: PlaybackPreset) -> QuickStartPresetSettings {
@@ -219,6 +243,14 @@ public struct AppSettings: Codable, Equatable, Sendable {
 }
 
 public struct CryDetectionEvent: Codable, Equatable, Sendable, Identifiable {
+    public enum EventType: String, Codable, Equatable, Sendable {
+        case cryDetected
+        case autoResettleStarted
+        case autoResettleEnded
+        case listeningWindowExpired
+        case legacyCryResponse
+    }
+
     public enum Action: String, Codable, Equatable, Sendable, CaseIterable {
         case startedPlayback
         case increasedVolume
@@ -229,12 +261,32 @@ public struct CryDetectionEvent: Codable, Equatable, Sendable, Identifiable {
     public let timestamp: Date
     public let confidence: Float
     public let actions: [Action]
+    public let eventType: EventType
+    public let presetName: String?
+    public let soundID: String?
+    public let soundTitle: String?
+    public let resettleDuration: TimeInterval?
 
-    public init(id: UUID = UUID(), timestamp: Date = Date(), confidence: Float, actions: [Action] = []) {
+    public init(
+        id: UUID = UUID(),
+        timestamp: Date = Date(),
+        confidence: Float,
+        actions: [Action] = [],
+        eventType: EventType = .legacyCryResponse,
+        presetName: String? = nil,
+        soundID: String? = nil,
+        soundTitle: String? = nil,
+        resettleDuration: TimeInterval? = nil
+    ) {
         self.id = id
         self.timestamp = timestamp
         self.confidence = confidence
         self.actions = actions
+        self.eventType = eventType
+        self.presetName = presetName
+        self.soundID = soundID
+        self.soundTitle = soundTitle
+        self.resettleDuration = resettleDuration
     }
 
     enum CodingKeys: String, CodingKey {
@@ -242,6 +294,11 @@ public struct CryDetectionEvent: Codable, Equatable, Sendable, Identifiable {
         case timestamp
         case confidence
         case actions
+        case eventType
+        case presetName
+        case soundID
+        case soundTitle
+        case resettleDuration
     }
 
     public init(from decoder: Decoder) throws {
@@ -250,5 +307,10 @@ public struct CryDetectionEvent: Codable, Equatable, Sendable, Identifiable {
         timestamp = try container.decodeIfPresent(Date.self, forKey: .timestamp) ?? Date()
         confidence = try container.decodeIfPresent(Float.self, forKey: .confidence) ?? 0
         actions = try container.decodeIfPresent([Action].self, forKey: .actions) ?? []
+        eventType = try container.decodeIfPresent(EventType.self, forKey: .eventType) ?? .legacyCryResponse
+        presetName = try container.decodeIfPresent(String.self, forKey: .presetName)
+        soundID = try container.decodeIfPresent(String.self, forKey: .soundID)
+        soundTitle = try container.decodeIfPresent(String.self, forKey: .soundTitle)
+        resettleDuration = try container.decodeIfPresent(TimeInterval.self, forKey: .resettleDuration)
     }
 }

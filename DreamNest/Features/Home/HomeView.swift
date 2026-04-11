@@ -64,13 +64,21 @@ struct HomeView: View {
                 selectedSoundID: viewModel.quickPresetSound(for: preset).id,
                 durationMinutes: Int(viewModel.quickPresetConfiguration(for: preset).duration / 60),
                 cryDetectionEnabled: viewModel.quickPresetConfiguration(for: preset).cryModeEnabled,
+                smartResettleEnabled: viewModel.quickPresetConfiguration(for: preset).smartResettleEnabled,
+                listeningWindowMinutes: Int(viewModel.quickPresetConfiguration(for: preset).listeningWindow / 60),
+                resettleDurationMinutes: Int(viewModel.quickPresetConfiguration(for: preset).resettleDuration / 60),
+                maxAutoResettles: viewModel.quickPresetConfiguration(for: preset).maxAutoResettles,
                 sounds: viewModel.catalog,
-                onSave: { soundID, minutes, cryEnabled in
+                onSave: { soundID, minutes, cryEnabled, smartEnabled, listeningMinutes, resettleMinutes, maxCount in
                     viewModel.updateQuickPreset(
                         preset,
                         durationMinutes: minutes,
                         cryModeEnabled: cryEnabled,
-                        soundID: soundID
+                        soundID: soundID,
+                        smartResettleEnabled: smartEnabled,
+                        listeningWindowMinutes: listeningMinutes,
+                        resettleDurationMinutes: resettleMinutes,
+                        maxAutoResettles: maxCount
                     )
                 }
             )
@@ -139,7 +147,7 @@ struct HomeView: View {
             ForEach([PlaybackPreset.bedtime, PlaybackPreset.nap], id: \.self) { preset in
                 PresetCard(
                     title: preset == .bedtime ? "Sleep" : "Nap",
-                    subtitle: "\(Int(viewModel.quickPresetConfiguration(for: preset).duration / 60)) min • \(viewModel.quickPresetConfiguration(for: preset).cryModeEnabled ? "Cry On" : "Cry Off")",
+                    subtitle: "\(Int(viewModel.quickPresetConfiguration(for: preset).duration / 60)) min • \(viewModel.quickPresetConfiguration(for: preset).smartResettleEnabled ? "Smart On" : "Smart Off")",
                     icon: preset == .bedtime ? "moon.stars.fill" : "cloud.sun.fill",
                     tapAction: {
                         softHaptic()
@@ -210,9 +218,10 @@ struct HomeView: View {
     }
 
     private var statusMessage: String {
-        isRecentlyTriggered
-            ? "Baby stirred — soothing started 🤍"
-            : "Listening for your baby 👂"
+        if isRecentlyTriggered {
+            return "Baby stirred — soothing started 🤍"
+        }
+        return viewModel.smartResettleStatusLabel
     }
 
     private func toggleSleep() {
@@ -410,8 +419,12 @@ private struct PresetConfigurationSheet: View {
     @State var selectedSoundID: String
     @State var durationMinutes: Int
     @State var cryDetectionEnabled: Bool
+    @State var smartResettleEnabled: Bool
+    @State var listeningWindowMinutes: Int
+    @State var resettleDurationMinutes: Int
+    @State var maxAutoResettles: Int
     let sounds: [SoundDefinition]
-    let onSave: (String, Int, Bool) -> Void
+    let onSave: (String, Int, Bool, Bool, Int, Int, Int) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -430,6 +443,40 @@ private struct PresetConfigurationSheet: View {
                     Toggle("Enable Cry Detection", isOn: $cryDetectionEnabled)
                 }
 
+                Section("Smart Resettle") {
+                    Toggle("Enable Smart Resettle", isOn: $smartResettleEnabled)
+                        .onChange(of: smartResettleEnabled) { newValue in
+                            if newValue {
+                                cryDetectionEnabled = true
+                            }
+                        }
+                    Text("After the session ends, DreamNest can keep listening and gently restart soothing audio if crying returns.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if smartResettleEnabled {
+                    Section("Smart Resettle Options") {
+                        Picker("Listening Window", selection: $listeningWindowMinutes) {
+                            ForEach([15, 30, 45, 60], id: \.self) { minutes in
+                                Text("\(minutes) min").tag(minutes)
+                            }
+                        }
+
+                        Picker("Resettle Audio", selection: $resettleDurationMinutes) {
+                            ForEach([3, 5, 10, 15], id: \.self) { minutes in
+                                Text("\(minutes) min").tag(minutes)
+                            }
+                        }
+
+                        Picker("Max Auto-Resettles", selection: $maxAutoResettles) {
+                            ForEach([1, 2, 3], id: \.self) { count in
+                                Text("\(count)").tag(count)
+                            }
+                        }
+                    }
+                }
+
                 Section("Timer") {
                     Stepper(value: $durationMinutes, in: 1 ... 180, step: 1) {
                         Text("Duration: \(durationMinutes) min")
@@ -446,7 +493,15 @@ private struct PresetConfigurationSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") {
-                        onSave(selectedSoundID, durationMinutes, cryDetectionEnabled)
+                        onSave(
+                            selectedSoundID,
+                            durationMinutes,
+                            cryDetectionEnabled,
+                            smartResettleEnabled,
+                            listeningWindowMinutes,
+                            resettleDurationMinutes,
+                            maxAutoResettles
+                        )
                         dismiss()
                     }
                     .fontWeight(.semibold)
