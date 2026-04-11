@@ -1,13 +1,15 @@
 import Foundation
 
-public enum PlaybackPreset: String, Codable, CaseIterable, Sendable {
+public enum PlaybackPreset: String, Codable, CaseIterable, Sendable, Identifiable {
     case nap
     case bedtime
+
+    public var id: String { rawValue }
 
     public var title: String {
         switch self {
         case .nap: "Nap"
-        case .bedtime: "Bedtime"
+        case .bedtime: "Sleep"
         }
     }
 
