@@ -49,6 +49,14 @@ struct HomeView: View {
             .padding(.horizontal, 20)
             .padding(.top, 20)
             .padding(.bottom, 30)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Color.clear
+                    .frame(height: 10)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Color.clear
+                    .frame(height: 8)
+            }
             .animation(.easeInOut(duration: 0.35), value: viewModel.isPlaying)
             .animation(.easeInOut(duration: 0.35), value: viewModel.selectedSound.id)
             .animation(.easeInOut(duration: 0.35), value: isRecentlyTriggered)
