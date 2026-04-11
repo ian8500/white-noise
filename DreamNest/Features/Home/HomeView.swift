@@ -164,14 +164,29 @@ struct HomeView: View {
         let config = viewModel.quickPresetConfiguration(for: preset)
         let presetSound = viewModel.quickPresetSound(for: preset)
         let isPressed = pressedQuickPreset == preset
-        let label = HStack(alignment: .center, spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill((prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent).opacity(prominent ? 0.2 : 0.14))
-                    .frame(width: 34, height: 34)
-                Image(systemName: preset == .nap ? "sun.min.fill" : "moon.fill")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent)
+        let label = VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill((prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent).opacity(prominent ? 0.2 : 0.14))
+                        .frame(width: 38, height: 38)
+                    Image(systemName: preset == .nap ? "sun.min.fill" : "moon.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Start \(preset.title)")
+                        .font(.title3.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.9)
+                    Text(presetSound.title)
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.9)
+                        .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.88) : DreamNestTheme.secondaryText)
+                }
+                Spacer(minLength: 0)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -186,7 +201,9 @@ struct HomeView: View {
                     .minimumScaleFactor(0.85)
             }
 
-            Spacer(minLength: 0)
+                Label(config.cryModeEnabled ? "Cry On" : "Cry Off", systemImage: config.cryModeEnabled ? "waveform.and.mic" : "waveform.slash")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
             Text("Long Press")
                 .font(.caption2.weight(.semibold))
