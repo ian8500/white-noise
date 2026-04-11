@@ -527,6 +527,49 @@ private struct PresetConfigurationSheet: View {
                             .foregroundStyle(Color(hex: "F5F7FA"))
                             .font(.subheadline.weight(.semibold))
                     }
+
+                    HStack {
+                        Label("Smart Resettle", systemImage: "sparkles")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color(hex: "F5F7FA").opacity(0.9))
+                        Spacer()
+                        Toggle("", isOn: $smartResettleEnabled.animation(.easeInOut(duration: 0.25)))
+                            .labelsHidden()
+                            .tint(Color(hex: "E4A890"))
+                    }
+
+                    if smartResettleEnabled {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("A gentle helper that can replay your selected sound if crying returns. It is not a safety monitor.")
+                                .font(.caption)
+                                .foregroundStyle(Color(hex: "F5F7FA").opacity(0.72))
+
+                            presetOptionRow(
+                                title: "Listening Window",
+                                selection: $listeningWindowMinutes,
+                                values: [15, 30, 45, 60],
+                                suffix: "min"
+                            )
+                            presetOptionRow(
+                                title: "Resettle Playback",
+                                selection: $resettleDurationMinutes,
+                                values: [3, 5, 10, 15],
+                                suffix: "min"
+                            )
+                            presetOptionRow(
+                                title: "Max Auto-Resettles",
+                                selection: $maxAutoResettles,
+                                values: [1, 2, 3],
+                                suffix: ""
+                            )
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(Color(hex: "F5F7FA").opacity(0.05))
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
                 .padding(16)
                 .background(
@@ -566,6 +609,25 @@ private struct PresetConfigurationSheet: View {
             }
         }
         .presentationDetents([.large])
+    }
+
+    private func presetOptionRow(
+        title: String,
+        selection: Binding<Int>,
+        values: [Int],
+        suffix: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color(hex: "F5F7FA").opacity(0.8))
+            Picker(title, selection: selection) {
+                ForEach(values, id: \.self) { value in
+                    Text(suffix.isEmpty ? "\(value)" : "\(value) \(suffix)").tag(value)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
     }
 }
 

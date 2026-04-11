@@ -30,29 +30,44 @@ public enum SmartResettleMode: Equatable, Sendable {
 public struct SmartResettleSession: Equatable, Sendable {
     public let preset: PlaybackPreset
     public let sound: SoundDefinition
+    public let presetDuration: TimeInterval
+    public let sessionStartTime: Date
     public let scheduledTimerEnd: Date
     public let listeningWindowEnd: Date
+    public let cryDetectionEnabled: Bool
+    public let smartResettleEnabled: Bool
     public let configuration: SmartResettleConfiguration
     public var autoResettleCount: Int
     public var lastAutoResettleAt: Date?
+    public var resettleEndTime: Date?
     public var mode: SmartResettleMode
 
     public init(
         preset: PlaybackPreset,
         sound: SoundDefinition,
+        presetDuration: TimeInterval,
+        sessionStartTime: Date,
         scheduledTimerEnd: Date,
+        cryDetectionEnabled: Bool,
+        smartResettleEnabled: Bool = true,
         configuration: SmartResettleConfiguration,
         autoResettleCount: Int = 0,
         lastAutoResettleAt: Date? = nil,
+        resettleEndTime: Date? = nil,
         mode: SmartResettleMode = .playingPreset
     ) {
         self.preset = preset
         self.sound = sound
+        self.presetDuration = max(60, presetDuration)
+        self.sessionStartTime = sessionStartTime
         self.scheduledTimerEnd = scheduledTimerEnd
         self.listeningWindowEnd = scheduledTimerEnd.addingTimeInterval(configuration.listeningWindow)
+        self.cryDetectionEnabled = cryDetectionEnabled
+        self.smartResettleEnabled = smartResettleEnabled
         self.configuration = configuration
         self.autoResettleCount = autoResettleCount
         self.lastAutoResettleAt = lastAutoResettleAt
+        self.resettleEndTime = resettleEndTime
         self.mode = mode
     }
 

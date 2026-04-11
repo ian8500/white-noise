@@ -124,6 +124,7 @@ final class HomeViewModel: ObservableObject {
     func startPreset(_ preset: PlaybackPreset) async {
         let config = quickPresetConfiguration(for: preset)
         let presetSound = quickPresetSound(for: preset)
+        let sessionStart = dateProvider()
         settings.timer.duration = config.duration
         selectSound(presetSound)
         let effectiveCryMode = config.cryModeEnabled || config.smartResettleEnabled
@@ -133,7 +134,10 @@ final class HomeViewModel: ObservableObject {
             ? SmartResettleSession(
                 preset: preset,
                 sound: presetSound,
-                scheduledTimerEnd: dateProvider().addingTimeInterval(config.duration),
+                presetDuration: config.duration,
+                sessionStartTime: sessionStart,
+                scheduledTimerEnd: sessionStart.addingTimeInterval(config.duration),
+                cryDetectionEnabled: effectiveCryMode,
                 configuration: .init(
                     listeningWindow: config.listeningWindow,
                     resettleDuration: config.resettleDuration,
@@ -146,7 +150,8 @@ final class HomeViewModel: ObservableObject {
         await startPlayback(
             sound: presetSound,
             duration: settings.timer.duration,
-            micModeEnabled: effectiveCryMode
+            micModeEnabled: effectiveCryMode,
+            sessionMode: .playingPreset
         )
     }
 
@@ -283,6 +288,15 @@ final class HomeViewModel: ObservableObject {
     }
 
     func stopPlaybackFromAutomation() async {
+        if let session = smartResettleSession {
+            appendSmartResettleEvent(
+                .sessionManuallyStopped,
+                preset: session.preset,
+                sound: session.sound,
+                confidence: 0,
+                duration: session.resettleEndTime?.timeIntervalSince(session.lastAutoResettleAt ?? session.sessionStartTime)
+            )
+        }
         timer.cancel()
         playbackSessionStore.clear()
         await audio.stop(fadeDuration: 0.3)
@@ -620,22 +634,28 @@ final class HomeViewModel: ObservableObject {
     private func startCryTriggeredPlayback() {
         let targetSound = catalog.first(where: { $0.id == Self.cryTriggeredSoundID }) ?? selectedSound
         Task {
-            await startPlayback(
-                sound: targetSound,
-                duration: 5 * 60,
-                micModeEnabled: true
-            )
+                    await startPlayback(
+                        sound: targetSound,
+                        duration: 5 * 60,
+                        micModeEnabled: true,
+                        sessionMode: .autoResettling
+                    )
         }
     }
 
-    private func startPlayback(sound: SoundDefinition, duration: TimeInterval, micModeEnabled: Bool) async {
+    private func startPlayback(
+        sound: SoundDefinition,
+        duration: TimeInterval,
+        micModeEnabled: Bool,
+        sessionMode: SmartResettleMode? = nil
+    ) async {
         do {
             try audio.configureSession(micModeEnabled: micModeEnabled)
             try await audio.play(sound: sound, volume: safetyPolicy.clamped(volume: volume))
             timer.start(duration: duration, fadeDuration: settings.timer.fadeDuration)
             isPlaying = true
-            if var session = smartResettleSession {
-                session.mode = .autoResettling
+            if var session = smartResettleSession, let sessionMode {
+                session.mode = sessionMode
                 smartResettleSession = session
             }
             updateSmartResettleStatus()
@@ -650,6 +670,7 @@ final class HomeViewModel: ObservableObject {
     private func handlePresetTimerCompletion() async {
         await audio.stop(fadeDuration: 1.2)
         guard var session = smartResettleSession else { return }
+        session.resettleEndTime = nil
         if session.isInListeningWindow(at: dateProvider()) {
             session.mode = .listeningForResettle
             smartResettleSession = session
@@ -688,6 +709,7 @@ final class HomeViewModel: ObservableObject {
         appendSmartResettleEvent(.cryDetected, preset: session.preset, sound: session.sound, confidence: signal.confidence, duration: nil)
         session.autoResettleCount += 1
         session.lastAutoResettleAt = now
+        session.resettleEndTime = now.addingTimeInterval(session.configuration.resettleDuration)
         session.mode = .autoResettling
         smartResettleSession = session
         updateSmartResettleStatus()
@@ -696,9 +718,15 @@ final class HomeViewModel: ObservableObject {
 
         Task { [weak self] in
             guard let self else { return }
-            await startPlayback(sound: session.sound, duration: session.configuration.resettleDuration, micModeEnabled: true)
+            await startPlayback(
+                sound: session.sound,
+                duration: session.configuration.resettleDuration,
+                micModeEnabled: true,
+                sessionMode: .autoResettling
+            )
             appendSmartResettleEvent(.autoResettleEnded, preset: session.preset, sound: session.sound, confidence: 0, duration: session.configuration.resettleDuration)
             guard var updated = smartResettleSession else { return }
+            updated.resettleEndTime = nil
             if updated.isInListeningWindow(at: dateProvider()), updated.hasResettleCapacity {
                 updated.mode = .listeningForResettle
             } else {
@@ -747,7 +775,9 @@ final class HomeViewModel: ObservableObject {
         case .listeningForResettle:
             smartResettleStatusLabel = "Listening for resettle"
         case .autoResettling:
-            smartResettleStatusLabel = "Resettling with \(session.sound.title)"
+            let remaining = max(0, Int((session.resettleEndTime?.timeIntervalSince(dateProvider()) ?? 0).rounded(.up) / 60))
+            let suffix = remaining > 0 ? " • \(remaining) min left" : ""
+            smartResettleStatusLabel = "Resettling with \(session.sound.title)\(suffix)"
         case .completed:
             smartResettleStatusLabel = "Smart Resettle complete"
         }
@@ -887,6 +917,7 @@ private extension CryDetectionEvent.EventType {
         case .autoResettleStarted: return "Auto-resettle started"
         case .autoResettleEnded: return "Auto-resettle ended"
         case .listeningWindowExpired: return "Listening window expired"
+        case .sessionManuallyStopped: return "Session stopped"
         case .legacyCryResponse: return "Cry response action"
         }
     }
@@ -910,6 +941,8 @@ private extension CryDetectionEvent.EventType {
             return "\(presetName ?? "Session") • \(soundTitle ?? "Sound")"
         case .listeningWindowExpired:
             return "\(presetName ?? "Session") finished"
+        case .sessionManuallyStopped:
+            return "\(presetName ?? "Session") manually stopped"
         }
     }
 }

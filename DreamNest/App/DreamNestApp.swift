@@ -131,9 +131,9 @@ private struct CryDetectionAlertsView: View {
 
             if alerts.isEmpty {
                 ContentUnavailableView(
-                    "No cry alerts yet",
+                    "No history yet",
                     systemImage: "bell.slash",
-                    description: Text("When DreamNest detects crying, alerts will appear here.")
+                    description: Text("When DreamNest notices cry patterns and helps with resettling, events will appear here.")
                 )
             } else {
                 List {
@@ -157,7 +157,7 @@ private struct CryDetectionAlertsView: View {
                 .scrollContentBackground(.hidden)
             }
         }
-        .navigationTitle("Smart Resettle Alerts")
+        .navigationTitle("Smart Resettle History")
         .alert("Clear all alerts?", isPresented: $showClearConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Clear All", role: .destructive) {
