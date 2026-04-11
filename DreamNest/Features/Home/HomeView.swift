@@ -14,44 +14,47 @@ struct HomeView: View {
     private let timerAdjustments = [-10, -5, -1, 1, 5, 10]
 
     var body: some View {
-        ZStack {
-            DreamGradientBackground(isBreathing: $backgroundBreathing)
-                .ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                DreamGradientBackground(isBreathing: $backgroundBreathing)
+                    .ignoresSafeArea()
 
-            VStack(spacing: 22) {
-                header
+                VStack(spacing: 22) {
+                    header
 
-                Spacer(minLength: 6)
+                    Spacer(minLength: 6)
 
-                SleepButton(
-                    isActive: viewModel.isPlaying,
-                    size: controlSize,
-                    action: toggleSleep
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    SleepButton(
+                        isActive: viewModel.isPlaying,
+                        size: controlSize,
+                        action: toggleSleep
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
 
-                timerPanel
+                    timerPanel
 
-                presetSection
+                    presetSection
 
-                soundSelector
+                    soundSelector
 
-                StatusPill(
-                    text: statusMessage,
-                    isTriggered: isRecentlyTriggered
-                )
-                .transition(.opacity)
+                    StatusPill(
+                        text: statusMessage,
+                        isTriggered: isRecentlyTriggered
+                    )
+                    .transition(.opacity)
 
-                Spacer()
+                    Spacer()
 
-                trustSignals
+                    trustSignals
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, max(20, geometry.safeAreaInsets.top + 12))
+                .padding(.bottom, max(30, geometry.safeAreaInsets.bottom + 14))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(.easeInOut(duration: 0.35), value: viewModel.isPlaying)
+                .animation(.easeInOut(duration: 0.35), value: viewModel.selectedSound.id)
+                .animation(.easeInOut(duration: 0.35), value: isRecentlyTriggered)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 30)
-            .animation(.easeInOut(duration: 0.35), value: viewModel.isPlaying)
-            .animation(.easeInOut(duration: 0.35), value: viewModel.selectedSound.id)
-            .animation(.easeInOut(duration: 0.35), value: isRecentlyTriggered)
         }
         .preferredColorScheme(.dark)
         .onAppear {
