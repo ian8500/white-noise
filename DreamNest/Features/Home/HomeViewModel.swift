@@ -388,6 +388,10 @@ final class HomeViewModel: ObservableObject {
         Self.formatAsMinutesAndSeconds(settings.timer.duration)
     }
 
+    var configuredTimerDuration: TimeInterval {
+        settings.timer.duration
+    }
+
     var timerCountdownTitle: String {
         if isPlaying, timerRemaining > 0 {
             return "\(timerDurationFriendlyLabel) left"

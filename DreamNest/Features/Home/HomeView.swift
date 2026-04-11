@@ -9,9 +9,12 @@ struct HomeView: View {
     @State private var backgroundBreathing = false
     @State private var editingPreset: PlaybackPreset?
     @State private var isShowingSoundPicker = false
+    @State private var activeAdjustmentControl: Int?
 
     private let controlSize: CGFloat = 220
-    private let timerAdjustments = [-10, -5, -1, 1, 5, 10]
+    private let decrementAdjustments = [-10, -5, -1]
+    private let incrementAdjustments = [1, 5, 10]
+    private let quickPresets = [30, 45, 60, 120]
 
     var body: some View {
         ZStack {
@@ -139,29 +142,34 @@ struct HomeView: View {
     }
 
     private var timerPanel: some View {
-        VStack(spacing: 10) {
-            Text(viewModel.timerCountdownTitle)
-                .font(.system(size: 24, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(hex: "F5F7FA"))
+        VStack(spacing: 14) {
+            HStack(spacing: 12) {
+                timerAdjustmentColumn(values: decrementAdjustments)
 
-            Text(viewModel.timerCountdownSubtitle)
-                .font(.footnote)
-                .foregroundStyle(Color(hex: "F5F7FA").opacity(0.7))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
+                TimerCenterDisplay(
+                    title: viewModel.timerDurationFriendlyLabel,
+                    subtitle: viewModel.isPlaying ? "left" : "set duration",
+                    detail: viewModel.timerCountdownSubtitle
+                )
 
-            HStack(spacing: 8) {
-                ForEach(timerAdjustments, id: \.self) { delta in
-                    TimerAdjustmentPill(deltaMinutes: delta) {
-                        softHaptic(style: .soft)
-                        viewModel.adjustTimerDuration(minutesDelta: delta)
+                timerAdjustmentColumn(values: incrementAdjustments)
+            }
+
+            HStack(spacing: 10) {
+                ForEach(quickPresets, id: \.self) { preset in
+                    QuickPresetButton(
+                        title: presetTitle(minutes: preset),
+                        isActive: selectedTimerMinutes == preset
+                    ) {
+                        softHaptic(style: .soft, intensity: 0.9)
+                        viewModel.applyTimerPreset(minutes: preset)
                     }
                 }
             }
-            .padding(.top, 6)
+            .padding(.horizontal, 2)
         }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 14)
         .background(.ultraThinMaterial.opacity(0.22))
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -171,6 +179,41 @@ struct HomeView: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(Color(hex: "F5F7FA").opacity(0.15), lineWidth: 1)
         )
+    }
+
+    private func timerAdjustmentColumn(values: [Int]) -> some View {
+        VStack(spacing: 9) {
+            ForEach(values, id: \.self) { delta in
+                TimerAdjustmentPill(
+                    deltaMinutes: delta,
+                    isPressed: activeAdjustmentControl == delta
+                ) {
+                    activeAdjustmentControl = delta
+                    softHaptic(style: .soft, intensity: 0.86)
+                    viewModel.adjustTimerDuration(minutesDelta: delta)
+                } onPressEnded: {
+                    if activeAdjustmentControl == delta {
+                        activeAdjustmentControl = nil
+                    }
+                }
+            }
+        }
+    }
+
+    private var selectedTimerMinutes: Int {
+        let seconds = viewModel.isPlaying ? viewModel.timerRemaining : viewModel.configuredTimerDuration
+        return Int(seconds / 60)
+    }
+
+    private func presetTitle(minutes: Int) -> String {
+        switch minutes {
+        case 60:
+            return "1h"
+        case 120:
+            return "2h"
+        default:
+            return "\(minutes)m"
+        }
     }
 
     private var presetSection: some View {
@@ -365,22 +408,133 @@ private struct SleepButton: View {
 
 private struct TimerAdjustmentPill: View {
     let deltaMinutes: Int
+    let isPressed: Bool
+    let onAdjust: () -> Void
+    let onPressEnded: () -> Void
+
+    @State private var holdTask: Task<Void, Never>?
+    @State private var didFireContinuousAdjustment = false
+    @State private var isTouchDown = false
+
+    var body: some View {
+        Text(deltaMinutes > 0 ? "+\(deltaMinutes)" : "\(deltaMinutes)")
+            .font(.system(size: 14, weight: .semibold, design: .rounded))
+            .foregroundStyle(Color(hex: "F5F7FA").opacity(0.97))
+            .frame(minWidth: 58)
+            .padding(.vertical, 10)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color(hex: "F5F7FA").opacity(0.11))
+            )
+            .background(
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial.opacity(0.28))
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(Color(hex: "F5F7FA").opacity(0.2), lineWidth: 1)
+            )
+            .shadow(color: Color(hex: "E4A890").opacity(0.24), radius: 11, y: 4)
+            .scaleEffect(isPressed ? 0.94 : 1.0)
+            .animation(.spring(response: 0.28, dampingFraction: 0.74), value: isPressed)
+            .contentShape(Capsule(style: .continuous))
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !isTouchDown else { return }
+                        isTouchDown = true
+                        didFireContinuousAdjustment = false
+                        startContinuousAdjustment()
+                    }
+                    .onEnded { _ in
+                        endPress()
+                    }
+            )
+            .onDisappear {
+                holdTask?.cancel()
+            }
+    }
+
+    private func startContinuousAdjustment() {
+        holdTask?.cancel()
+        holdTask = Task {
+            try? await Task.sleep(for: .milliseconds(330))
+            guard !Task.isCancelled else { return }
+            var interval = 0.2
+            while !Task.isCancelled {
+                await MainActor.run {
+                    didFireContinuousAdjustment = true
+                    onAdjust()
+                }
+                try? await Task.sleep(for: .seconds(interval))
+                interval = max(0.075, interval * 0.9)
+            }
+        }
+    }
+
+    private func endPress() {
+        isTouchDown = false
+        holdTask?.cancel()
+        if !didFireContinuousAdjustment {
+            onAdjust()
+        }
+        onPressEnded()
+    }
+}
+
+private struct TimerCenterDisplay: View {
+    let title: String
+    let subtitle: String
+    let detail: String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("\(title) \(subtitle)")
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .foregroundStyle(Color(hex: "F5F7FA"))
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.8)
+
+            Text(detail)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Color(hex: "F5F7FA").opacity(0.68))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, minHeight: 116)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color(hex: "F5F7FA").opacity(0.07))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color(hex: "F5F7FA").opacity(0.15), lineWidth: 1)
+        )
+        .shadow(color: Color(hex: "A2B8FF").opacity(0.22), radius: 18, y: 6)
+    }
+}
+
+private struct QuickPresetButton: View {
+    let title: String
+    let isActive: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(deltaMinutes > 0 ? "+\(deltaMinutes)" : "\(deltaMinutes)")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(hex: "F5F7FA").opacity(0.95))
+            Text(title)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(hex: "F5F7FA").opacity(isActive ? 1 : 0.84))
+                .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(Color(hex: "F5F7FA").opacity(0.1))
+                        .fill(Color(hex: "F5F7FA").opacity(isActive ? 0.2 : 0.08))
                 )
                 .overlay(
                     Capsule(style: .continuous)
-                        .stroke(Color(hex: "F5F7FA").opacity(0.17), lineWidth: 1)
+                        .stroke(Color(hex: "F5F7FA").opacity(isActive ? 0.3 : 0.14), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
