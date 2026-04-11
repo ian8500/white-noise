@@ -154,6 +154,7 @@ struct HomeView: View {
             quickPresetButton(for: .nap, prominent: false)
             quickPresetButton(for: .bedtime, prominent: true)
         }
+        .frame(maxWidth: .infinity)
         .tint(DreamNestTheme.accent)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -175,17 +176,22 @@ struct HomeView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Start \(preset.title)")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.88)
                 Text("\(presetSound.title) • \(Int(config.duration / 60))m • Cry \(config.cryModeEnabled ? "On" : "Off")")
                     .font(.caption)
                     .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.85) : DreamNestTheme.secondaryText)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
 
             Spacer(minLength: 0)
 
             Text("Long Press")
                 .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
                 .background(
@@ -196,9 +202,10 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         label
             .foregroundStyle(prominent ? DreamNestTheme.primaryText : DreamNestTheme.primaryText)
+            .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(prominent ? DreamNestTheme.accent : DreamNestTheme.cardBackground)
