@@ -248,6 +248,7 @@ public struct CryDetectionEvent: Codable, Equatable, Sendable, Identifiable {
         case autoResettleStarted
         case autoResettleEnded
         case listeningWindowExpired
+        case sessionManuallyStopped
         case legacyCryResponse
     }
 
