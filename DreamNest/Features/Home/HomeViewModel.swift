@@ -461,16 +461,16 @@ final class HomeViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state in
                 guard let self else { return }
-                timerRemaining = state.remaining
-                let didTimerComplete = wasTimerRunning && !state.isRunning
-                wasTimerRunning = state.isRunning
+                self.timerRemaining = state.remaining
+                let didTimerComplete = self.wasTimerRunning && !state.isRunning
+                self.wasTimerRunning = state.isRunning
 
                 if didTimerComplete {
-                    _ = advancePlaybackGeneration()
-                    isPlaying = false
-                    playbackSessionStore.clear()
-                    if smartResettleSession != nil {
-                        Task { await handlePresetTimerCompletion() }
+                    _ = self.advancePlaybackGeneration()
+                    self.isPlaying = false
+                    self.playbackSessionStore.clear()
+                    if self.smartResettleSession != nil {
+                        Task { await self.handlePresetTimerCompletion() }
                     } else {
                         Task { await self.audio.stop(fadeDuration: 0.3) }
                     }
@@ -478,8 +478,8 @@ final class HomeViewModel: ObservableObject {
 
                 let fadeGain = FadeCurve.gain(remaining: state.remaining, fadeDuration: state.fadeDuration)
                 if state.isRunning {
-                    audio.updateVolume(volume * fadeGain, rampDuration: 0.5)
-                    persistPlaybackSnapshotIfNeeded()
+                    self.audio.updateVolume(self.volume * fadeGain, rampDuration: 0.5)
+                    self.persistPlaybackSnapshotIfNeeded()
                 }
             }
             .store(in: &cancellables)
@@ -489,35 +489,35 @@ final class HomeViewModel: ObservableObject {
             .sink { [weak self] signal in
                 guard let self else { return }
 
-                lastCryDetectionTime = signal.date
-                lastCryConfidence = signal.confidence
-                processSmartResettleSignal(signal)
+                self.lastCryDetectionTime = signal.date
+                self.lastCryConfidence = signal.confidence
+                self.processSmartResettleSignal(signal)
 
-                guard let action = cryResponseCoordinator.handle(
+                guard let action = self.cryResponseCoordinator.handle(
                           signal: signal,
-                          isEnabled: settings.cryResponse.enabled,
-                          settings: settings.cryResponse,
-                          currentVolume: volume,
-                          safetyPolicy: safetyPolicy
+                          isEnabled: self.settings.cryResponse.enabled,
+                          settings: self.settings.cryResponse,
+                          currentVolume: self.volume,
+                          safetyPolicy: self.safetyPolicy
                       )
                 else { return }
                 var actions: [CryDetectionEvent.Action] = [.increasedVolume]
 
-                setVolume(action.targetVolume)
-                if isPlaying {
-                    timer.extend(by: action.timerExtension)
+                self.setVolume(action.targetVolume)
+                if self.isPlaying {
+                    self.timer.extend(by: action.timerExtension)
                     actions.append(.extendedTimer)
-                    lastCryActionSummary = "Increased volume and extended timer"
+                    self.lastCryActionSummary = "Increased volume and extended timer"
                 } else {
-                    startCryTriggeredPlayback()
+                    self.startCryTriggeredPlayback()
                     actions.append(.startedPlayback)
-                    lastCryActionSummary = "Started playback and increased volume"
+                    self.lastCryActionSummary = "Started playback and increased volume"
                 }
                 if action.shouldRecordEvent {
-                    store.appendCryEvent(.init(timestamp: signal.date, confidence: signal.confidence, actions: actions))
-                    recentCryEvents = store.loadCryEvents(limit: 200).map(CryEventRow.init)
+                    self.store.appendCryEvent(.init(timestamp: signal.date, confidence: signal.confidence, actions: actions))
+                    self.recentCryEvents = self.store.loadCryEvents(limit: 200).map(CryEventRow.init)
                 }
-                refreshCooldownState()
+                self.refreshCooldownState()
             }
             .store(in: &cancellables)
 
@@ -526,11 +526,11 @@ final class HomeViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] systemValue in
                 guard let self else { return }
-                let clamped = safetyPolicy.clamped(volume: systemValue)
-                volume = clamped
-                audio.updateVolume(clamped, rampDuration: 0.1)
-                settings.lastVolume = clamped
-                store.save(settings)
+                let clamped = self.safetyPolicy.clamped(volume: systemValue)
+                self.volume = clamped
+                self.audio.updateVolume(clamped, rampDuration: 0.1)
+                self.settings.lastVolume = clamped
+                self.store.save(self.settings)
             }
             .store(in: &cancellables)
 
