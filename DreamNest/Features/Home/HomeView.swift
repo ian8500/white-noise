@@ -189,35 +189,40 @@ struct HomeView: View {
                 Spacer(minLength: 0)
             }
 
-            HStack(spacing: 8) {
-                Label("\(Int(config.duration / 60)) min", systemImage: "timer")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Start \(preset.title)")
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.88)
+                Text("\(presetSound.title) • \(Int(config.duration / 60))m • Cry \(config.cryModeEnabled ? "On" : "Off")")
+                    .font(.caption)
+                    .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.85) : DreamNestTheme.secondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
+            }
 
                 Label(config.cryModeEnabled ? "Cry On" : "Cry Off", systemImage: config.cryModeEnabled ? "waveform.and.mic" : "waveform.slash")
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
 
-                Spacer(minLength: 0)
-
-                Text("Hold")
-                    .lineLimit(1)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill((prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent).opacity(0.16))
-                    )
-                    .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.9) : DreamNestTheme.accent)
-            }
-            .font(.caption.weight(.semibold))
+            Text("Long Press")
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill((prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent).opacity(0.16))
+                )
+                .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.9) : DreamNestTheme.accent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 13)
-        .padding(.vertical, 13)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         label
             .foregroundStyle(prominent ? DreamNestTheme.primaryText : DreamNestTheme.primaryText)
-            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(prominent ? DreamNestTheme.accent : DreamNestTheme.cardBackground)
