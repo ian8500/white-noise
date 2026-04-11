@@ -1,603 +1,368 @@
 import SwiftUI
 import Combine
+#if os(iOS)
+import UIKit
+#endif
 
 struct HomeView: View {
     @StateObject var viewModel: HomeViewModel
-    @State private var isVolumeExpanded = true
-    @State private var isCryEventsExpanded = true
-    @State private var showStartRoutineDialog = false
-    @State private var suppressNextStartRoutineTap = false
-    @State private var selectedPresetForQuickControls: PlaybackPreset?
-    @State private var suppressNextPresetTap: PlaybackPreset?
-    @State private var pressedQuickPreset: PlaybackPreset?
+    @State private var backgroundBreathing = false
+
+    private let controlSize: CGFloat = 220
 
     var body: some View {
         ZStack {
-            DreamNestTheme.background.ignoresSafeArea()
+            DreamGradientBackground(isBreathing: $backgroundBreathing)
+                .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 18) {
-                    header
-                    timerHeroCard
-                    controlButtons
-                    presetButtons
-                    ExpandableSettingsCard(title: "Volume", isExpanded: $isVolumeExpanded) {
-                        volumeCardContent
-                    }
-                    ExpandableSettingsCard(title: "Cry Detection Events", isExpanded: $isCryEventsExpanded) {
-                        cryDetectionEventsContent
-                    }
-                }
-                .padding()
+            VStack(spacing: 24) {
+                header
+
+                Spacer(minLength: 10)
+
+                SleepButton(
+                    isActive: viewModel.isPlaying,
+                    size: controlSize,
+                    action: toggleSleep
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+
+                soundSelector
+
+                StatusPill(
+                    text: statusMessage,
+                    isTriggered: isRecentlyTriggered
+                )
+                .transition(.opacity)
+
+                Spacer()
+
+                trustSignals
             }
-        }
-        .overlay {
-            if showStartRoutineDialog {
-                startRoutineDialogOverlay
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                    .zIndex(2)
-            }
-        }
-        .overlay {
-            if let preset = selectedPresetForQuickControls {
-                presetQuickControlsOverlay(for: preset)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                    .zIndex(3)
-            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 30)
+            .animation(.easeInOut(duration: 0.35), value: viewModel.isPlaying)
+            .animation(.easeInOut(duration: 0.35), value: viewModel.selectedSound.id)
+            .animation(.easeInOut(duration: 0.35), value: isRecentlyTriggered)
         }
         .preferredColorScheme(.dark)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 4.5).repeatForever(autoreverses: true)) {
+                backgroundBreathing.toggle()
+            }
+        }
         .alert("Safety Guidance", isPresented: .constant(viewModel.warningBanner != nil), actions: {
             Button("OK") { viewModel.warningBanner = nil }
         }, message: {
             Text(viewModel.warningBanner ?? "")
         })
-        .animation(.easeInOut(duration: 0.2), value: showStartRoutineDialog)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("DreamNest")
-                .font(.largeTitle.weight(.bold))
-                .foregroundStyle(DreamNestTheme.primaryText)
-            Text("Premium white noise for calm, safer bedtimes.")
-                .foregroundStyle(DreamNestTheme.secondaryText)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("DreamNest. Premium white noise for calmer bedtimes.")
-    }
-
-
-    private var controlButtons: some View {
         VStack(spacing: 10) {
-            quickStartButton
-            stopButton
-        }
-    }
+            Text("DreamNest")
+                .font(.system(size: 42, weight: .bold, design: .rounded))
+                .tracking(0.8)
+                .foregroundStyle(Color(red: 0.96, green: 0.97, blue: 0.99))
 
-    private var quickStartButton: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Start Routine", systemImage: "moon.zzz.fill")
-                .font(.title3.weight(.semibold))
-            HStack(spacing: 8) {
-                Image(systemName: "timer")
-                    .font(.caption.weight(.semibold))
-                Text("Sleep timer: \(viewModel.formattedTimerDuration)")
-                    .font(.footnote.weight(.medium))
-                Spacer()
-                Text("Long press to adjust")
-                    .font(.caption)
-                    .foregroundStyle(DreamNestTheme.primaryText.opacity(0.85))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-        .background(DreamNestTheme.accent)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .onTapGesture {
-            if suppressNextStartRoutineTap {
-                suppressNextStartRoutineTap = false
-                return
-            }
-            viewModel.startDefaultRoutine()
-        }
-        .onLongPressGesture(minimumDuration: 0.5) {
-            suppressNextStartRoutineTap = true
-            showStartRoutineDialog = true
-        }
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Starts your configured routine. Long press to adjust timer and sound.")
-    }
-
-    private var timerHeroCard: some View {
-        HStack(alignment: .center, spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(DreamNestTheme.accent.opacity(0.16))
-                    .frame(width: 52, height: 52)
-                Image(systemName: viewModel.isPlaying ? "timer.circle.fill" : "timer.circle")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(DreamNestTheme.accent)
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(viewModel.timerCountdownTitle)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(DreamNestTheme.primaryText)
-                Text(viewModel.timerCountdownSubtitle)
-                    .font(.footnote)
-                    .foregroundStyle(DreamNestTheme.secondaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(DreamNestTheme.cardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(DreamNestTheme.accent.opacity(0.28), lineWidth: 1)
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Sleep timer status. \(viewModel.timerCountdownTitle). \(viewModel.timerCountdownSubtitle)")
-    }
-
-
-    private var presetButtons: some View {
-        HStack(spacing: 10) {
-            quickPresetButton(for: .nap, prominent: false)
-            quickPresetButton(for: .bedtime, prominent: true)
+            Text("Helping your baby sleep, so you can too")
+                .font(.system(size: 17, weight: .regular, design: .rounded))
+                .foregroundStyle(Color(red: 0.96, green: 0.97, blue: 0.99).opacity(0.72))
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .tint(DreamNestTheme.accent)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("DreamNest. Helping your baby sleep, so you can too")
     }
 
-    @ViewBuilder
-    private func quickPresetButton(for preset: PlaybackPreset, prominent: Bool) -> some View {
-        let config = viewModel.quickPresetConfiguration(for: preset)
-        let presetSound = viewModel.quickPresetSound(for: preset)
-        let isPressed = pressedQuickPreset == preset
-        let label = VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill((prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent).opacity(prominent ? 0.2 : 0.14))
-                        .frame(width: 38, height: 38)
-                    Image(systemName: preset == .nap ? "sun.min.fill" : "moon.fill")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Start \(preset.title)")
-                        .font(.title3.weight(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.9)
-                    Text(presetSound.title)
-                        .font(.subheadline.weight(.medium))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.9)
-                        .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.88) : DreamNestTheme.secondaryText)
-                }
-                Spacer(minLength: 0)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Start \(preset.title)")
-                    .font(.headline.weight(.semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.88)
-                Text("\(presetSound.title) • \(Int(config.duration / 60))m • Cry \(config.cryModeEnabled ? "On" : "Off")")
-                    .font(.caption)
-                    .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.85) : DreamNestTheme.secondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-            }
-
-                Label(config.cryModeEnabled ? "Cry On" : "Cry Off", systemImage: config.cryModeEnabled ? "waveform.and.mic" : "waveform.slash")
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-
-            Text("Long Press")
-                .font(.caption2.weight(.semibold))
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill((prominent ? DreamNestTheme.primaryText : DreamNestTheme.accent).opacity(0.16))
-                )
-                .foregroundStyle(prominent ? DreamNestTheme.primaryText.opacity(0.9) : DreamNestTheme.accent)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        label
-            .foregroundStyle(prominent ? DreamNestTheme.primaryText : DreamNestTheme.primaryText)
-            .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(prominent ? DreamNestTheme.accent : DreamNestTheme.cardBackground)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(prominent ? DreamNestTheme.accent.opacity(0.35) : DreamNestTheme.accent.opacity(0.26), lineWidth: 1)
-            )
-            .scaleEffect(isPressed ? 0.985 : 1)
-            .shadow(color: DreamNestTheme.accent.opacity(prominent ? 0.24 : 0.10), radius: prominent ? 10 : 6, y: 3)
-            .animation(.easeOut(duration: 0.12), value: isPressed)
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .onTapGesture {
-                if suppressNextPresetTap == preset {
-                    suppressNextPresetTap = nil
-                    return
-                }
-                Task { await viewModel.startPreset(preset) }
-            }
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 0.5)
-                    .onEnded { _ in
-                        suppressNextPresetTap = preset
-                        pressedQuickPreset = nil
-                        selectedPresetForQuickControls = preset
-                    }
-            )
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        pressedQuickPreset = preset
-                    }
-                    .onEnded { _ in
-                        pressedQuickPreset = nil
-                    }
-            )
-            .accessibilityAddTraits(.isButton)
-            .accessibilityHint("Tap to start \(preset.title). Long press for quick controls.")
-    }
-
-    private func timerStepButton(title: String, action: @escaping () -> Void) -> some View {
-        Button(title, action: action)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(DreamNestTheme.elevatedControlBackground)
-            .clipShape(Capsule())
-            .foregroundStyle(DreamNestTheme.primaryText)
-    }
-
-    private var stopButton: some View {
-        Button(action: viewModel.stopPlayback) {
-            Label("Stop", systemImage: "stop.fill")
-                .font(.headline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(DreamNestTheme.cardBackground.opacity(0.95))
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(DreamNestTheme.secondaryText.opacity(0.3), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .disabled(!viewModel.isPlaying)
-        .opacity(viewModel.isPlaying ? 1 : 0.55)
-        .foregroundStyle(DreamNestTheme.primaryText)
-        .accessibilityHint("Stops audio playback and cancels the active timer.")
-    }
-
-    private var volumeCardContent: some View {
-        Slider(value: Binding(
-            get: { Double(viewModel.volume) },
-            set: { viewModel.setVolume(Float($0)) }
-        ), in: 0 ... 1)
-        .accessibilityLabel("Playback volume")
-        .accessibilityValue("\(Int(viewModel.volume * 100)) percent")
-    }
-
-    private var startRoutineDialogOverlay: some View {
-        modalOverlayContainer(dismissAction: { showStartRoutineDialog = false }) {
-            dialogHeader(
-                title: "Start Routine Controls",
-                subtitle: "Set timer and sound before you start.",
-                dismissAction: { showStartRoutineDialog = false }
-            )
-
-            VStack(alignment: .leading, spacing: 8) {
-                dialogSectionTitle("Sleep Timer")
-                HStack(spacing: 8) {
-                    timerStepButton(title: "-10m") { viewModel.adjustTimerDuration(minutesDelta: -10) }
-                    timerStepButton(title: "-5m") { viewModel.adjustTimerDuration(minutesDelta: -5) }
-                    timerStepButton(title: "-1m") { viewModel.adjustTimerDuration(minutesDelta: -1) }
-                    Spacer(minLength: 4)
-                    timerStepButton(title: "+1m") { viewModel.adjustTimerDuration(minutesDelta: 1) }
-                    timerStepButton(title: "+5m") { viewModel.adjustTimerDuration(minutesDelta: 5) }
-                    timerStepButton(title: "+10m") { viewModel.adjustTimerDuration(minutesDelta: 10) }
-                }
-                Text("Current timer: \(viewModel.formattedTimerDuration)")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(DreamNestTheme.primaryText)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                dialogSectionTitle("Sound")
-                ScrollView {
-                    VStack(spacing: 8) {
-                        ForEach(viewModel.catalog) { sound in
-                            Button {
+    private var soundSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 14) {
+                ForEach(featuredSounds, id: \.id) { sound in
+                    SoundCard(
+                        sound: sound,
+                        isSelected: viewModel.selectedSound.id == sound.id,
+                        action: {
+                            softHaptic()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                                 viewModel.selectSound(sound)
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Text(sound.title)
-                                        .lineLimit(1)
-                                    Spacer()
-                                    if viewModel.selectedSound.id == sound.id {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(DreamNestTheme.accent)
-                                    }
-                                }
-                                .foregroundStyle(DreamNestTheme.primaryText)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(DreamNestTheme.elevatedControlBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .frame(maxHeight: 220)
-            }
-
-            dialogDoneButton {
-                showStartRoutineDialog = false
-            }
-        }
-    }
-
-    private func presetQuickControlsOverlay(for preset: PlaybackPreset) -> some View {
-        let config = viewModel.quickPresetConfiguration(for: preset)
-        let sound = viewModel.quickPresetSound(for: preset)
-
-        return modalOverlayContainer(dismissAction: {
-            selectedPresetForQuickControls = nil
-            suppressNextPresetTap = nil
-        }) {
-            dialogHeader(
-                title: "\(preset.title) Quick Controls",
-                subtitle: "Fine-tune duration, sound, and cry response.",
-                dismissAction: {
-                    selectedPresetForQuickControls = nil
-                    suppressNextPresetTap = nil
-                }
-            )
-
-            VStack(alignment: .leading, spacing: 8) {
-                dialogSectionTitle("Duration")
-                HStack(spacing: 8) {
-                    timerStepButton(title: "-5m") {
-                        let updated = max(1, Int(config.duration / 60) - 5)
-                        viewModel.updateQuickPreset(preset, durationMinutes: updated)
-                    }
-                    timerStepButton(title: "-1m") {
-                        let updated = max(1, Int(config.duration / 60) - 1)
-                        viewModel.updateQuickPreset(preset, durationMinutes: updated)
-                    }
-                    timerStepButton(title: "+1m") {
-                        viewModel.updateQuickPreset(preset, durationMinutes: Int(config.duration / 60) + 1)
-                    }
-                    timerStepButton(title: "+5m") {
-                        viewModel.updateQuickPreset(preset, durationMinutes: Int(config.duration / 60) + 5)
-                    }
-                }
-                Text("Current: \(Int(config.duration / 60)) minutes")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(DreamNestTheme.primaryText)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                dialogSectionTitle("Sound")
-                Menu {
-                    ForEach(viewModel.catalog) { candidate in
-                        Button {
-                            viewModel.updateQuickPreset(preset, soundID: candidate.id)
-                        } label: {
-                            if sound.id == candidate.id {
-                                Label(candidate.title, systemImage: "checkmark")
-                            } else {
-                                Text(candidate.title)
                             }
                         }
-                    }
-                } label: {
-                    HStack {
-                        Text(sound.title)
-                            .lineLimit(1)
-                        Spacer()
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(DreamNestTheme.secondaryText)
-                    }
-                    .font(.footnote.weight(.medium))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 9)
-                    .background(DreamNestTheme.elevatedControlBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    )
                 }
             }
-
-            Toggle("Enable cry response", isOn: Binding(
-                get: { viewModel.quickPresetConfiguration(for: preset).cryModeEnabled },
-                set: { viewModel.updateQuickPreset(preset, cryModeEnabled: $0) }
-            ))
-            .tint(DreamNestTheme.accent)
-            .font(.footnote)
-
-            Spacer(minLength: 0)
-
-            dialogDoneButton {
-                selectedPresetForQuickControls = nil
-                suppressNextPresetTap = nil
-            }
+            .padding(.horizontal, 2)
+            .padding(.vertical, 6)
         }
+        .frame(height: 110)
     }
 
-    @ViewBuilder
-    private func modalOverlayContainer<Content: View>(
-        dismissAction: @escaping () -> Void,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        ZStack {
-            Color.black.opacity(0.55)
-                .ignoresSafeArea()
-                .onTapGesture(perform: dismissAction)
+    private var trustSignals: some View {
+        VStack(spacing: 6) {
+            Text("Designed for safe, restful sleep")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Color(red: 0.96, green: 0.97, blue: 0.99).opacity(0.7))
 
-            VStack(alignment: .leading, spacing: 14) {
-                content()
-            }
-            .padding(18)
-            .frame(maxWidth: 440)
-            .frame(height: 470, alignment: .top)
-            .background(DreamNestTheme.modalBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(DreamNestTheme.secondaryText.opacity(0.2), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.25), radius: 20, y: 10)
-            .padding(.horizontal, 16)
-            .accessibilityAddTraits(.isModal)
+            Text("Recommended by parents")
+                .font(.footnote)
+                .foregroundStyle(Color(red: 0.96, green: 0.97, blue: 0.99).opacity(0.48))
         }
+        .multilineTextAlignment(.center)
     }
 
-    private func dialogHeader(title: String, subtitle: String, dismissAction: @escaping () -> Void) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(DreamNestTheme.primaryText)
-                Text(subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(DreamNestTheme.secondaryText)
-            }
-            Spacer()
-            Button(action: dismissAction) {
-                Image(systemName: "xmark")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(DreamNestTheme.primaryText)
-                    .padding(8)
-                    .background(DreamNestTheme.elevatedControlBackground)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
+    private var featuredSounds: [SoundDefinition] {
+        let desired = ["rain", "white-noise", "heartbeat", "ocean"]
+        let indexed = Dictionary(uniqueKeysWithValues: viewModel.catalog.map { ($0.id.lowercased(), $0) })
+
+        let ordered = desired.compactMap { key in
+            indexed.first(where: { $0.key.contains(key) })?.value
         }
+
+        if !ordered.isEmpty {
+            return ordered
+        }
+
+        return Array(viewModel.catalog.prefix(4))
     }
 
-    private func dialogSectionTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(DreamNestTheme.secondaryText)
+    private var isRecentlyTriggered: Bool {
+        guard let timestamp = viewModel.lastCryDetectionTime else { return false }
+        return Date().timeIntervalSince(timestamp) < 90
     }
 
-    private func dialogDoneButton(action: @escaping () -> Void) -> some View {
-        Button("Done", action: action)
-            .font(.headline.weight(.semibold))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(DreamNestTheme.accent)
-            .foregroundStyle(DreamNestTheme.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    private var statusMessage: String {
+        isRecentlyTriggered
+            ? "Baby stirred — soothing started 🤍"
+            : "Listening for your baby 👂"
     }
 
-
-    private var cryDetectionEventsContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Recent trigger actions")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(DreamNestTheme.secondaryText)
-                Spacer()
-                Button("Clear Triggers", role: .destructive, action: viewModel.clearCryEvents)
-                    .font(.caption.weight(.semibold))
-                    .buttonStyle(.plain)
-            }
-
-            if viewModel.recentCryEvents.isEmpty {
-                Text("No cry detection events have been recorded yet.")
-                    .foregroundStyle(DreamNestTheme.secondaryText)
-                    .font(.footnote)
+    private func toggleSleep() {
+        softHaptic()
+        withAnimation(.easeInOut(duration: 0.35)) {
+            if viewModel.isPlaying {
+                viewModel.stopPlayback()
             } else {
-                VStack(spacing: 8) {
-                    ForEach(viewModel.recentCryEvents) { event in
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: "waveform.and.mic")
-                                .foregroundStyle(DreamNestTheme.accent)
-                                .padding(.top, 2)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(event.actionDescription)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(DreamNestTheme.primaryText)
-                                Text("\(event.timestamp.formatted(date: .abbreviated, time: .shortened)) • Confidence \(Int(event.confidence * 100))%")
-                                    .font(.caption)
-                                    .foregroundStyle(DreamNestTheme.secondaryText)
-                            }
-                            Spacer()
-                        }
-                        .padding(10)
-                        .background(DreamNestTheme.background.opacity(0.75))
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                }
+                viewModel.startDefaultRoutine()
             }
+        }
+    }
+
+    private func softHaptic() {
+#if os(iOS)
+        let generator = UIImpactFeedbackGenerator(style: .soft)
+        generator.impactOccurred(intensity: 0.85)
+#endif
+    }
+}
+
+private struct DreamGradientBackground: View {
+    @Binding var isBreathing: Bool
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(hex: "0B1C2C"),
+                    Color(hex: "2E335D"),
+                    Color(hex: "6E5E64")
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            RadialGradient(
+                colors: [
+                    Color(hex: "E4A890").opacity(isBreathing ? 0.38 : 0.24),
+                    Color(hex: "E4A890").opacity(0)
+                ],
+                center: .center,
+                startRadius: 18,
+                endRadius: isBreathing ? 360 : 280
+            )
+            .blur(radius: 30)
+            .animation(.easeInOut(duration: 4.5).repeatForever(autoreverses: true), value: isBreathing)
         }
     }
 }
 
-private struct ExpandableSettingsCard<Content: View>: View {
-    let title: String
-    @Binding var isExpanded: Bool
-    @ViewBuilder var content: Content
+private struct SleepButton: View {
+    let isActive: Bool
+    let size: CGFloat
+    let action: () -> Void
+
+    @State private var pulse = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: "E4A890").opacity(isActive ? 0.34 : 0.22), .clear],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: size * 0.9
+                    )
+                )
+                .frame(width: size * 1.35, height: size * 1.35)
+                .scaleEffect(isActive && pulse ? 1.06 : 0.96)
+                .opacity(isActive ? 1 : 0.9)
+                .blur(radius: 5)
+
+            Button(action: action) {
+                VStack(spacing: 11) {
+                    Image(systemName: isActive ? "moon.zzz.fill" : "moon.stars.fill")
+                        .font(.system(size: 34, weight: .semibold, design: .rounded))
+
+                    Text(isActive ? "Sleeping..." : "Start Sleep")
+                        .font(.system(size: 23, weight: .semibold, design: .rounded))
                 }
-            } label: {
-                HStack(spacing: 8) {
-                    Text(title)
-                        .font(.headline)
-                    Spacer()
-                    Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(DreamNestTheme.accent)
-                }
-                .foregroundStyle(DreamNestTheme.primaryText)
+                .foregroundStyle(Color(hex: "F5F7FA"))
+                .frame(width: size, height: size)
+                .background(
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "2A3E62").opacity(0.98),
+                                    Color(hex: "141F36").opacity(0.98)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color(hex: "F5F7FA").opacity(0.26), lineWidth: 1)
+                )
+                .shadow(color: Color(hex: "E4A890").opacity(isActive ? 0.45 : 0.24), radius: isActive ? 24 : 14, y: 6)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(title). \(isExpanded ? "Expanded" : "Collapsed")")
-            .accessibilityHint("Double tap to \(isExpanded ? "collapse" : "expand") section.")
-
-            if isExpanded {
-                content
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+            .contentShape(Circle())
+            .accessibilityLabel(isActive ? "Sleeping" : "Start Sleep")
+            .accessibilityHint("Starts or stops the sleep routine")
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) {
+                pulse.toggle()
             }
         }
-        .padding()
-        .background(DreamNestTheme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .animation(.easeInOut(duration: 0.35), value: isActive)
+    }
+}
+
+private struct SoundCard: View {
+    let sound: SoundDefinition
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(displayEmoji)
+                    .font(.title3)
+                Text(displayTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(Color(hex: "F5F7FA").opacity(isSelected ? 1 : 0.86))
+            .frame(width: 116, height: 84, alignment: .leading)
+            .padding(.horizontal, 12)
+            .background(.ultraThinMaterial.opacity(0.28))
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color(hex: "F5F7FA").opacity(isSelected ? 0.1 : 0.05))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color(hex: "F5F7FA").opacity(isSelected ? 0.35 : 0.14), lineWidth: 1)
+            )
+            .shadow(color: Color(hex: "E4A890").opacity(isSelected ? 0.3 : 0.08), radius: isSelected ? 14 : 6, y: 4)
+            .scaleEffect(isSelected ? 1.03 : 1)
+            .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isSelected)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var displayTitle: String {
+        let value = sound.title.lowercased()
+        if value.contains("white") { return "White Noise" }
+        if value.contains("heart") { return "Heartbeat" }
+        if value.contains("ocean") { return "Ocean" }
+        if value.contains("rain") { return "Rain" }
+        return sound.title
+    }
+
+    private var displayEmoji: String {
+        let value = sound.title.lowercased()
+        if value.contains("white") { return "🌬" }
+        if value.contains("heart") { return "❤️" }
+        if value.contains("ocean") { return "🌊" }
+        if value.contains("rain") { return "🌧" }
+        return "🎵"
+    }
+}
+
+private struct StatusPill: View {
+    let text: String
+    let isTriggered: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(isTriggered ? Color(hex: "E4A890") : Color(hex: "9BC4FF"))
+                .frame(width: 7, height: 7)
+                .shadow(color: (isTriggered ? Color(hex: "E4A890") : Color(hex: "9BC4FF")).opacity(0.65), radius: 5)
+
+            Text(text)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Color(hex: "F5F7FA").opacity(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color(hex: "F5F7FA").opacity(0.1))
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(DreamNestTheme.secondaryText.opacity(0.16), lineWidth: 1)
+            Capsule(style: .continuous)
+                .stroke(Color(hex: "F5F7FA").opacity(0.18), lineWidth: 1)
+        )
+    }
+}
+
+private extension Color {
+    init(hex: String) {
+        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: cleaned).scanHexInt64(&int)
+
+        let red: UInt64
+        let green: UInt64
+        let blue: UInt64
+        let alpha: UInt64
+
+        switch cleaned.count {
+        case 3:
+            (alpha, red, green, blue) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6:
+            (alpha, red, green, blue) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8:
+            (alpha, red, green, blue) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (alpha, red, green, blue) = (255, 245, 247, 250)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(red) / 255,
+            green: Double(green) / 255,
+            blue: Double(blue) / 255,
+            opacity: Double(alpha) / 255
         )
     }
 }
