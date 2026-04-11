@@ -7,18 +7,20 @@ import UIKit
 struct HomeView: View {
     @StateObject var viewModel: HomeViewModel
     @State private var backgroundBreathing = false
+    @State private var editingPreset: PlaybackPreset?
 
     private let controlSize: CGFloat = 220
+    private let timerAdjustments = [-10, -5, -1, 1, 5, 10]
 
     var body: some View {
         ZStack {
             DreamGradientBackground(isBreathing: $backgroundBreathing)
                 .ignoresSafeArea()
 
-            VStack(spacing: 24) {
+            VStack(spacing: 22) {
                 header
 
-                Spacer(minLength: 10)
+                Spacer(minLength: 6)
 
                 SleepButton(
                     isActive: viewModel.isPlaying,
@@ -26,6 +28,10 @@ struct HomeView: View {
                     action: toggleSleep
                 )
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
+
+                timerPanel
+
+                presetSection
 
                 soundSelector
 
@@ -52,6 +58,23 @@ struct HomeView: View {
                 backgroundBreathing.toggle()
             }
         }
+        .sheet(item: $editingPreset) { preset in
+            PresetConfigurationSheet(
+                preset: preset,
+                selectedSoundID: viewModel.quickPresetSound(for: preset).id,
+                durationMinutes: Int(viewModel.quickPresetConfiguration(for: preset).duration / 60),
+                cryDetectionEnabled: viewModel.quickPresetConfiguration(for: preset).cryModeEnabled,
+                sounds: viewModel.catalog,
+                onSave: { soundID, minutes, cryEnabled in
+                    viewModel.updateQuickPreset(
+                        preset,
+                        durationMinutes: minutes,
+                        cryModeEnabled: cryEnabled,
+                        soundID: soundID
+                    )
+                }
+            )
+        }
         .alert("Safety Guidance", isPresented: .constant(viewModel.warningBanner != nil), actions: {
             Button("OK") { viewModel.warningBanner = nil }
         }, message: {
@@ -74,6 +97,61 @@ struct HomeView: View {
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("DreamNest. Helping your baby sleep, so you can too")
+    }
+
+    private var timerPanel: some View {
+        VStack(spacing: 10) {
+            Text(viewModel.timerCountdownTitle)
+                .font(.system(size: 24, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(hex: "F5F7FA"))
+
+            Text(viewModel.timerCountdownSubtitle)
+                .font(.footnote)
+                .foregroundStyle(Color(hex: "F5F7FA").opacity(0.7))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+
+            HStack(spacing: 8) {
+                ForEach(timerAdjustments, id: \.self) { delta in
+                    TimerAdjustmentPill(deltaMinutes: delta) {
+                        softHaptic()
+                        viewModel.adjustTimerDuration(minutesDelta: delta)
+                    }
+                }
+            }
+            .padding(.top, 6)
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 12)
+        .background(.ultraThinMaterial.opacity(0.22))
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(hex: "F5F7FA").opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color(hex: "F5F7FA").opacity(0.15), lineWidth: 1)
+        )
+    }
+
+    private var presetSection: some View {
+        HStack(spacing: 12) {
+            ForEach([PlaybackPreset.bedtime, PlaybackPreset.nap], id: \.self) { preset in
+                PresetCard(
+                    title: preset == .bedtime ? "Sleep" : "Nap",
+                    subtitle: "\(Int(viewModel.quickPresetConfiguration(for: preset).duration / 60)) min • \(viewModel.quickPresetConfiguration(for: preset).cryModeEnabled ? "Cry On" : "Cry Off")",
+                    icon: preset == .bedtime ? "moon.stars.fill" : "cloud.sun.fill",
+                    tapAction: {
+                        softHaptic()
+                        Task { await viewModel.startPreset(preset) }
+                    },
+                    longPressAction: {
+                        softHaptic()
+                        editingPreset = preset
+                    }
+                )
+            }
+        }
     }
 
     private var soundSelector: some View {
@@ -249,6 +327,133 @@ private struct SleepButton: View {
             }
         }
         .animation(.easeInOut(duration: 0.35), value: isActive)
+    }
+}
+
+private struct TimerAdjustmentPill: View {
+    let deltaMinutes: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(deltaMinutes > 0 ? "+\(deltaMinutes)" : "\(deltaMinutes)")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(hex: "F5F7FA").opacity(0.95))
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color(hex: "F5F7FA").opacity(0.1))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(Color(hex: "F5F7FA").opacity(0.17), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct PresetCard: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let tapAction: () -> Void
+    let longPressAction: () -> Void
+    @State private var didLongPress = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color(hex: "F5F7FA"))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(hex: "F5F7FA"))
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(hex: "F5F7FA").opacity(0.72))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 14)
+        .background(.ultraThinMaterial.opacity(0.24))
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(hex: "F5F7FA").opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color(hex: "F5F7FA").opacity(0.15), lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .onTapGesture {
+            if didLongPress {
+                didLongPress = false
+                return
+            }
+            tapAction()
+        }
+        .onLongPressGesture(minimumDuration: 0.5) {
+            didLongPress = true
+            longPressAction()
+        }
+    }
+}
+
+private struct PresetConfigurationSheet: View {
+    let preset: PlaybackPreset
+    @State var selectedSoundID: String
+    @State var durationMinutes: Int
+    @State var cryDetectionEnabled: Bool
+    let sounds: [SoundDefinition]
+    let onSave: (String, Int, Bool) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Sound") {
+                    Picker("Type", selection: $selectedSoundID) {
+                        ForEach(sounds, id: \.id) { sound in
+                            Text(sound.title).tag(sound.id)
+                        }
+                    }
+                }
+
+                Section("Cry Detection") {
+                    Toggle("Enable Cry Detection", isOn: $cryDetectionEnabled)
+                }
+
+                Section("Timer") {
+                    Stepper(value: $durationMinutes, in: 1 ... 180, step: 1) {
+                        Text("Duration: \(durationMinutes) min")
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(DreamNestTheme.background)
+            .navigationTitle("\(preset == .bedtime ? "Sleep" : "Nap") Preset")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") {
+                        onSave(selectedSoundID, durationMinutes, cryDetectionEnabled)
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

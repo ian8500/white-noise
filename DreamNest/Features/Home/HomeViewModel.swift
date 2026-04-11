@@ -78,7 +78,7 @@ final class HomeViewModel: ObservableObject {
         cryDetectionThreshold = settings.cryResponse.detectionThreshold
         favoriteSoundIDs = settings.favoriteSoundIDs
         recentSoundIDs = settings.recentSoundIDs
-        recentCryEvents = store.loadCryEvents(limit: 12).map(CryEventRow.init)
+        recentCryEvents = store.loadCryEvents(limit: 200).map(CryEventRow.init)
 
         if settings.routinePresets.isEmpty {
             settings.routinePresets = RoutinePreset.seededDefaults(using: settings)
@@ -157,6 +157,10 @@ final class HomeViewModel: ObservableObject {
         store.clearCryEvents()
         recentCryEvents = []
         lastCryActionSummary = "No cry events yet"
+    }
+
+    func loadCryEventRows(limit: Int = 200) -> [CryEventRow] {
+        store.loadCryEvents(limit: limit).map(CryEventRow.init)
     }
 
 
@@ -322,9 +326,9 @@ final class HomeViewModel: ObservableObject {
 
     var timerCountdownTitle: String {
         if isPlaying, timerRemaining > 0 {
-            return "\(formattedTimerRemaining) remaining"
+            return "\(timerDurationFriendlyLabel) left"
         }
-        return "Ready: \(formattedTimerDuration)"
+        return "Ready: \(timerDurationFriendlyLabel)"
     }
 
     var timerCountdownSubtitle: String {
@@ -332,6 +336,11 @@ final class HomeViewModel: ObservableObject {
             return "Playback stops automatically when countdown reaches 00:00."
         }
         return "Starts from \(formattedTimerDuration) when you begin a sleep session."
+    }
+
+    var timerDurationFriendlyLabel: String {
+        let seconds = (isPlaying && timerRemaining > 0) ? timerRemaining : settings.timer.duration
+        return friendlyDuration(seconds)
     }
 
     var cryMonitoringStatusLabel: String {
@@ -445,7 +454,7 @@ final class HomeViewModel: ObservableObject {
                 }
                 if action.shouldRecordEvent {
                     store.appendCryEvent(.init(timestamp: signal.date, confidence: signal.confidence, actions: actions))
-                    recentCryEvents = store.loadCryEvents(limit: 12).map(CryEventRow.init)
+                    recentCryEvents = store.loadCryEvents(limit: 200).map(CryEventRow.init)
                 }
                 refreshCooldownState()
             }
@@ -477,6 +486,20 @@ final class HomeViewModel: ObservableObject {
         let minutes = totalSeconds / 60
         let remainingSeconds = totalSeconds % 60
         return String(format: "%02d:%02d", minutes, remainingSeconds)
+    }
+
+    private func friendlyDuration(_ seconds: TimeInterval) -> String {
+        let totalMinutes = max(1, Int(seconds.rounded() / 60))
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+
+        if hours > 0, minutes > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        if hours > 0 {
+            return "\(hours)h"
+        }
+        return "\(totalMinutes) min"
     }
 
     private func updateRunningTimerForDurationChange(targetDuration: TimeInterval) {
