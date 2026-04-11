@@ -60,13 +60,18 @@ struct HomeView: View {
             }
         }
         .sheet(item: $editingPreset) { preset in
+            let config = viewModel.quickPresetConfiguration(for: preset)
             PresetConfigurationSheet(
                 preset: preset,
                 selectedSoundID: viewModel.quickPresetSound(for: preset).id,
-                durationMinutes: Int(viewModel.quickPresetConfiguration(for: preset).duration / 60),
-                cryDetectionEnabled: viewModel.quickPresetConfiguration(for: preset).cryModeEnabled,
+                durationMinutes: Int(config.duration / 60),
+                cryDetectionEnabled: config.cryModeEnabled,
+                smartResettleEnabled: config.smartResettleEnabled,
+                listeningWindowMinutes: Int(config.listeningWindow / 60),
+                resettleDurationMinutes: Int(config.resettleDuration / 60),
+                maxAutoResettles: config.maxAutoResettles,
                 sounds: soundCatalog,
-                onSave: { soundID, minutes, cryEnabled in
+                onSave: { soundID, minutes, cryEnabled, smartEnabled, listeningMinutes, resettleMinutes, maxCount in
                     viewModel.updateQuickPreset(
                         preset,
                         durationMinutes: minutes,
