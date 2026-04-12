@@ -71,7 +71,7 @@ struct HomeView: View {
     }
 
     private var statusStrip: some View {
-        HStack(spacing: HomeDesign.Spacing.small) {
+        HStack(spacing: 10) {
             StatusPill(text: statusMessage, isTriggered: isRecentlyTriggered)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
