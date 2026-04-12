@@ -82,7 +82,11 @@ final class HomeViewModel: ObservableObject {
         settings = store.load()
         settings.timer.duration = Self.defaultRoutineDuration
         store.save(settings)
-        selectedSound = catalogService.sound(id: settings.lastSoundID) ?? catalogService.sounds[0]
+
+        let fallbackCatalog = self.catalog.isEmpty ? SoundDefinition.seededCatalog : self.catalog
+        selectedSound = catalogService.sound(id: settings.lastSoundID)
+            ?? fallbackCatalog.first
+            ?? SoundDefinition.seededCatalog[0]
         volume = safetyPolicy.clamped(volume: self.systemVolume.currentVolume)
         cryModeEnabled = settings.cryResponse.enabled
         cryDetectionThreshold = settings.cryResponse.detectionThreshold
