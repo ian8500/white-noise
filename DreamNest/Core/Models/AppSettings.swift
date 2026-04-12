@@ -10,19 +10,46 @@ public struct TimerSettings: Codable, Equatable, Sendable {
     }
 }
 
+
+public enum CryComfortMode: String, Codable, CaseIterable, Equatable, Sendable {
+    case gentle
+    case balanced
+    case responsive
+
+    public var title: String {
+        switch self {
+        case .gentle: return "Gentle"
+        case .balanced: return "Balanced"
+        case .responsive: return "Responsive"
+        }
+    }
+
+    public var threshold: Float {
+        switch self {
+        case .gentle: return 0.78
+        case .balanced: return 0.68
+        case .responsive: return 0.58
+        }
+    }
+}
+
 public struct CryResponseSettings: Codable, Equatable, Sendable {
     public var enabled: Bool
     public var volumeBoostStep: Float
     public var timerExtension: TimeInterval
     public var cooldown: TimeInterval
     public var detectionThreshold: Float
+    public var comfortMode: CryComfortMode
+    public var hasSeenOnboarding: Bool
 
-    public init(enabled: Bool = false, volumeBoostStep: Float = 0.08, timerExtension: TimeInterval = 10 * 60, cooldown: TimeInterval = 30, detectionThreshold: Float = 0.68) {
+    public init(enabled: Bool = false, volumeBoostStep: Float = 0.08, timerExtension: TimeInterval = 10 * 60, cooldown: TimeInterval = 30, detectionThreshold: Float = 0.68, comfortMode: CryComfortMode = .balanced, hasSeenOnboarding: Bool = false) {
         self.enabled = enabled
         self.volumeBoostStep = volumeBoostStep
         self.timerExtension = timerExtension
         self.cooldown = cooldown
         self.detectionThreshold = max(0.4, min(detectionThreshold, 0.95))
+        self.comfortMode = comfortMode
+        self.hasSeenOnboarding = hasSeenOnboarding
     }
 
     enum CodingKeys: String, CodingKey {
@@ -31,6 +58,8 @@ public struct CryResponseSettings: Codable, Equatable, Sendable {
         case timerExtension
         case cooldown
         case detectionThreshold
+        case comfortMode
+        case hasSeenOnboarding
     }
 
     public init(from decoder: Decoder) throws {
@@ -41,6 +70,8 @@ public struct CryResponseSettings: Codable, Equatable, Sendable {
         cooldown = try container.decodeIfPresent(TimeInterval.self, forKey: .cooldown) ?? 30
         let threshold = try container.decodeIfPresent(Float.self, forKey: .detectionThreshold) ?? 0.68
         detectionThreshold = max(0.4, min(threshold, 0.95))
+        comfortMode = try container.decodeIfPresent(CryComfortMode.self, forKey: .comfortMode) ?? .balanced
+        hasSeenOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasSeenOnboarding) ?? false
     }
 }
 
