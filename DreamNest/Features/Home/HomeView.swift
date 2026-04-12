@@ -96,11 +96,14 @@ struct HomeView: View {
     private var presetSection: some View {
         HStack(spacing: 12) {
             ForEach([PlaybackPreset.bedtime, .nap], id: \.self) { preset in
-                PremiumPresetCard(
-                    preset: preset,
-                    config: viewModel.quickPresetConfiguration(for: preset),
-                    sound: viewModel.quickPresetSound(for: preset),
-                    pinned: isPinned(preset)
+                let config = viewModel.quickPresetConfiguration(for: preset)
+                let sound = viewModel.quickPresetSound(for: preset)
+                PresetCard(
+                    title: preset.title,
+                    icon: presetIcon(for: preset),
+                    soundTitle: sound.title,
+                    metadata: "\(Int(config.duration / 60)) min • Smart \(config.smartResettleEnabled ? "On" : "Off")",
+                    state: cardState(for: preset)
                 ) {
                     Task { await viewModel.startPreset(preset) }
                 } onLongPress: {
@@ -177,7 +180,26 @@ struct HomeView: View {
         return Date().timeIntervalSince(timestamp) < 90
     }
     private var statusMessage: String { isRecentlyTriggered ? "Cry detected" : viewModel.smartResettleStatusLabel }
-    private func isPinned(_ preset: PlaybackPreset) -> Bool { viewModel.smartResettleSession?.preset == preset || (!viewModel.isPlaying && preset == .bedtime) }
+    private func presetIcon(for preset: PlaybackPreset) -> String {
+        switch preset {
+        case .bedtime: return "moon.stars.fill"
+        case .nap: return "sun.max.fill"
+        }
+    }
+
+    private func cardState(for preset: PlaybackPreset) -> PresetCard.State {
+        var state: PresetCard.State = []
+        if viewModel.selectedSound.id == viewModel.quickPresetSound(for: preset).id {
+            state.insert(.selected)
+        }
+        if viewModel.activeQuickPreset == preset && viewModel.isPlaying {
+            state.insert(.active)
+        }
+        if viewModel.smartResettleSession?.preset == preset || (!viewModel.isPlaying && preset == .bedtime) {
+            state.insert(.pinned)
+        }
+        return state
+    }
 
     private func toggleSleep() {
         withAnimation(.easeInOut(duration: 0.3)) {
@@ -249,37 +271,6 @@ private struct PressRepeatButton: View {
         task?.cancel()
         task = nil
         if fire { action() }
-    }
-}
-
-private struct PremiumPresetCard: View {
-    let preset: PlaybackPreset
-    let config: QuickStartPresetSettings
-    let sound: SoundDefinition
-    let pinned: Bool
-    let onTap: () -> Void
-    let onLongPress: () -> Void
-
-    var body: some View {
-        SoundPressableTile(tapAction: onTap, longPressAction: onLongPress, longPressDuration: 0.45) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Label(preset.title, systemImage: preset == .bedtime ? "moon.stars.fill" : "cloud.sun.fill")
-                    Spacer()
-                    if pinned { Image(systemName: "pin.fill").foregroundStyle(Color(hex: "E4A890")) }
-                }
-                .font(.headline)
-                Text(sound.title)
-                    .font(.subheadline.weight(.semibold))
-                Text("\(Int(config.duration/60)) min • Smart \(config.smartResettleEnabled ? "On" : "Off")")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .foregroundStyle(.white)
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial.opacity(0.22), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
     }
 }
 
