@@ -71,7 +71,7 @@ struct HomeView: View {
     }
 
     private var statusStrip: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: HomeDesign.Spacing.small) {
             StatusPill(text: statusMessage, isTriggered: isRecentlyTriggered)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -170,7 +170,16 @@ struct HomeView: View {
             maxAutoResettles: config.maxAutoResettles,
             sounds: soundCatalog,
             onSave: { soundID, minutes, cryEnabled, smartEnabled, listeningMinutes, resettleMinutes, maxCount in
-                viewModel.updateQuickPreset(preset, durationMinutes: minutes, cryModeEnabled: cryEnabled, soundID: soundID, smartResettleEnabled: smartEnabled, listeningWindowMinutes: listeningMinutes, resettleDurationMinutes: resettleMinutes, maxAutoResettles: maxCount)
+                viewModel.updateQuickPreset(
+                    preset,
+                    durationMinutes: minutes,
+                    cryModeEnabled: cryEnabled,
+                    soundID: soundID,
+                    smartResettleEnabled: smartEnabled,
+                    listeningWindowMinutes: listeningMinutes,
+                    resettleDurationMinutes: resettleMinutes,
+                    maxAutoResettles: maxCount
+                )
             }
         )
     }
