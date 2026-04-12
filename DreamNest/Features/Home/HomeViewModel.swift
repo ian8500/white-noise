@@ -55,7 +55,6 @@ final class HomeViewModel: ObservableObject {
     private var recentCryConfidenceHits: [Date] = []
     private var consecutiveDetectedSignals = 0
     private var lastDetectedSignalAt: Date?
-    private var activePresetForSession: PlaybackPreset?
 
     init(
         catalogService: SoundCatalogProviding,
@@ -120,7 +119,7 @@ final class HomeViewModel: ObservableObject {
     }
 
     func quickStart() {
-        activePresetForSession = nil
+        activeQuickPreset = nil
         smartResettleSession = nil
         updateSmartResettleStatus()
         startRoutine(sound: selectedSound, volume: volume, timerDuration: settings.timer.duration, cryModeEnabled: cryModeEnabled)
@@ -138,7 +137,7 @@ final class HomeViewModel: ObservableObject {
         selectSound(presetSound)
         let effectiveCryMode = config.cryModeEnabled || config.smartResettleEnabled
         toggleCryMode(effectiveCryMode)
-        activePresetForSession = preset
+        activeQuickPreset = preset
         smartResettleSession = config.smartResettleEnabled
             ? SmartResettleSession(
                 preset: preset,
@@ -232,6 +231,9 @@ final class HomeViewModel: ObservableObject {
 
     func startRoutine(preset: RoutinePreset) {
         applyPreset(preset)
+        activeQuickPreset = nil
+        smartResettleSession = nil
+        updateSmartResettleStatus()
         startRoutine(sound: selectedSound, volume: volume, timerDuration: settings.timer.duration, cryModeEnabled: cryModeEnabled)
     }
 
@@ -311,7 +313,7 @@ final class HomeViewModel: ObservableObject {
         await audio.stop(fadeDuration: 0.3)
         isPlaying = false
         smartResettleSession = nil
-        activePresetForSession = nil
+        activeQuickPreset = nil
         updateSmartResettleStatus()
     }
 
