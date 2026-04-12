@@ -19,6 +19,7 @@
 		527B615A25DBA774DB83C3D4 /* NoiseSafetyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2084875C361E6FC1CD50C874 /* NoiseSafetyPolicy.swift */; };
 		5B0E8DA84F363922AFD3FF0C /* SleepTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989E04F38163DD999B4AA05D /* SleepTimerEngine.swift */; };
 		5CD8CBDCD55B6E0B85593F38 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95E74AD2E6BF3DA3D719D24A /* HomeView.swift */; };
+		5F2A9D7F3C9E4B1A8D6C2E11 /* HomeUIComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7F1C2D3E4A596877889900 /* HomeUIComponents.swift */; };
 		843D5D272F89216A0038D41E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 843D5D262F89216A0038D41E /* Assets.xcassets */; };
 		8C2C0FF69D1216BF505D651B /* LocalCryDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 548C60900DB5068353DC09D3 /* LocalCryDetectionService.swift */; };
 		8CC0E327992969C54C35329E /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF6A0848ADF49AB24F115B59 /* HomeViewModel.swift */; };
@@ -83,6 +84,7 @@
 		843D5D262F89216A0038D41E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8EA5CC42862742A5A9054368 /* PlaybackSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackSessionStore.swift; sourceTree = "<group>"; };
 		95E74AD2E6BF3DA3D719D24A /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		6B7F1C2D3E4A596877889900 /* HomeUIComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeUIComponents.swift; sourceTree = "<group>"; };
 		989E04F38163DD999B4AA05D /* SleepTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTimerEngine.swift; sourceTree = "<group>"; };
 		995D253D27F3222419A3F8A5 /* SleepTimerEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTimerEngineTests.swift; sourceTree = "<group>"; };
 		9B8D7C6A5E4F3D2C1B0A9987 /* HomeViewModelTimerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModelTimerTests.swift; sourceTree = "<group>"; };
@@ -153,6 +155,7 @@
 			isa = PBXGroup;
 			children = (
 				95E74AD2E6BF3DA3D719D24A /* HomeView.swift */,
+				6B7F1C2D3E4A596877889900 /* HomeUIComponents.swift */,
 				BF6A0848ADF49AB24F115B59 /* HomeViewModel.swift */,
 			);
 			path = Home;
@@ -432,6 +435,7 @@
 				1A2B3C4D5E6F708192A3B4C5 /* SystemVolumeService.swift in Sources */,
 				A6ED11473A15DF612ECE9FBB /* ExposureGuidanceView.swift in Sources */,
 				5CD8CBDCD55B6E0B85593F38 /* HomeView.swift in Sources */,
+				5F2A9D7F3C9E4B1A8D6C2E11 /* HomeUIComponents.swift in Sources */,
 				8CC0E327992969C54C35329E /* HomeViewModel.swift in Sources */,
 				AA41B00B5CFA4EAFA803BE9C /* CryResponseCoordinator.swift in Sources */,
 				928B4A3B45FA23D167D39B5B /* PreviewData.swift in Sources */,
