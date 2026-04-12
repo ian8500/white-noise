@@ -75,22 +75,21 @@ struct HomeView: View {
     }
 
     private var timerPanel: some View {
-        VStack(spacing: 14) {
-            PremiumTimerStepper(timeText: viewModel.timerDurationFriendlyLabel) { delta in
-                softHaptic(style: .soft)
+        TimerControlCard(
+            timeText: viewModel.timerDurationFriendlyLabel,
+            selectedPresetMinutes: viewModel.selectedTimerPresetMinutes,
+            quickPresets: quickPresets
+        ) { delta in
+            softHaptic(style: .soft)
+            withAnimation(.spring(duration: 0.25, bounce: 0.24)) {
                 viewModel.adjustTimerDuration(minutesDelta: delta)
             }
-
-            HStack(spacing: 10) {
-                ForEach(quickPresets, id: \.self) { preset in
-                    QuickPresetButton(title: preset == 60 ? "1h" : preset == 120 ? "2h" : "\(preset)m", isActive: selectedTimerMinutes == preset) {
-                        viewModel.applyTimerPreset(minutes: preset)
-                    }
-                }
+        } onSelectPreset: { preset in
+            softHaptic(style: .light)
+            withAnimation(.spring(duration: 0.3, bounce: 0.2)) {
+                viewModel.applyTimerPreset(minutes: preset)
             }
         }
-        .padding(16)
-        .background(.ultraThinMaterial.opacity(0.25), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var presetSection: some View {
@@ -171,7 +170,6 @@ struct HomeView: View {
     }
 
     private var soundCatalog: [SoundDefinition] { viewModel.catalog }
-    private var selectedTimerMinutes: Int { Int((viewModel.isPlaying ? viewModel.timerRemaining : viewModel.configuredTimerDuration) / 60) }
     private var isRecentlyTriggered: Bool {
         guard let timestamp = viewModel.lastCryDetectionTime else { return false }
         return Date().timeIntervalSince(timestamp) < 90
@@ -192,63 +190,113 @@ struct HomeView: View {
     }
 }
 
-private struct PremiumTimerStepper: View {
+private struct TimerControlCard: View {
     let timeText: String
+    let selectedPresetMinutes: Int?
+    let quickPresets: [Int]
     let onAdjust: (Int) -> Void
-    private let left = [-10, -5, -1]
-    private let right = [1, 5, 10]
+    let onSelectPreset: (Int) -> Void
+    private let adjustments = [-10, -5, -1, 1, 5, 10]
+    private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     var body: some View {
-        HStack(spacing: 8) {
-            ForEach(left, id: \.self) { delta in stepperButton(delta) }
-            Text(timeText)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-            ForEach(right, id: \.self) { delta in stepperButton(delta) }
+        VStack(spacing: 14) {
+            adjustmentSection
+            timerDisplay
+            presetSection
         }
+        .padding(16)
+        .background(.ultraThinMaterial.opacity(0.25), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func stepperButton(_ delta: Int) -> some View {
-        PressRepeatButton(title: delta > 0 ? "+\(delta)" : "\(delta)") { onAdjust(delta) }
-    }
-}
-
-private struct PressRepeatButton: View {
-    let title: String
-    let action: () -> Void
-    @State private var task: Task<Void, Never>?
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 14, weight: .semibold, design: .rounded))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
-            .background(Capsule().fill(Color.white.opacity(0.12)))
-            .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
-            .contentShape(Capsule())
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { _ in if task == nil { start() } }
-                .onEnded { _ in stop(fire: true) })
-            .onDisappear { task?.cancel() }
-    }
-
-    private func start() {
-        task = Task {
-            var interval = 220_000_000
-            try? await Task.sleep(nanoseconds: 320_000_000)
-            while !Task.isCancelled {
-                await MainActor.run { action() }
-                try? await Task.sleep(nanoseconds: UInt64(interval))
-                interval = max(80_000_000, Int(Double(interval) * 0.86))
+    private var adjustmentSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Adjustments")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.68))
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(adjustments, id: \.self) { delta in
+                    TimerPillButton(title: delta > 0 ? "+\(delta)" : "\(delta)") {
+                        onAdjust(delta)
+                    }
+                    .accessibilityLabel(delta > 0 ? "Increase timer by \(delta) minutes" : "Decrease timer by \(abs(delta)) minutes")
+                }
             }
         }
     }
 
-    private func stop(fire: Bool) {
-        task?.cancel()
-        task = nil
-        if fire { action() }
+    private var timerDisplay: some View {
+        VStack(spacing: 6) {
+            Text("Sleep Timer")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.68))
+            Text(timeText)
+                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .contentTransition(.numericText())
+                .animation(.spring(duration: 0.25, bounce: 0.18), value: timeText)
+                .accessibilityLabel("Timer duration")
+                .accessibilityValue(timeText)
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var presetSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Presets")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.68))
+            HStack(spacing: 10) {
+                ForEach(quickPresets, id: \.self) { preset in
+                    TimerPillButton(
+                        title: presetTitle(for: preset),
+                        isSelected: selectedPresetMinutes == preset
+                    ) {
+                        onSelectPreset(preset)
+                    }
+                    .accessibilityLabel("Set timer to \(presetTitle(for: preset))")
+                    .accessibilityValue(selectedPresetMinutes == preset ? "Selected" : "Not selected")
+                }
+            }
+        }
+    }
+
+    private func presetTitle(for minutes: Int) -> String {
+        switch minutes {
+        case 60: return "1h"
+        case 120: return "2h"
+        default: return "\(minutes)m"
+        }
+    }
+}
+
+private struct TimerPillButton: View {
+    let title: String
+    var isSelected = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.92)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .foregroundStyle(.white)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? Color.white.opacity(0.28) : Color.white.opacity(0.12))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(isSelected ? Color.white.opacity(0.85) : Color.white.opacity(0.2), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
