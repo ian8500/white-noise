@@ -18,23 +18,34 @@ struct HomeView: View {
             DreamGradientBackground(isBreathing: $backgroundBreathing)
                 .ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 16) {
-                    header
-                    SleepButton(isActive: viewModel.isPlaying, size: 210, action: toggleSleep)
-                    statusStrip
-                    timerPanel
-                    presetSection
-                    soundSelector
-                    cryConfidencePanel
-                    trustSignals
+            VStack(spacing: 0) {
+                heroSection
+                    .padding(.horizontal, HomeDesign.Spacing.screen)
+                    .padding(.top, HomeDesign.Spacing.heroTop)
+                    .padding(.bottom, HomeDesign.Spacing.sectionLarge)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: HomeDesign.Spacing.section) {
+                        statusStrip
+                        timerSection
+                        presetsSection
+                        soundSection
+                        smartResettleSection
+                        trustSignals
+                    }
+                    .padding(.horizontal, HomeDesign.Spacing.screen)
+                    .padding(.bottom, HomeDesign.Spacing.bottomClearance)
                 }
-                .padding(20)
+            }
+            .safeAreaInset(edge: .bottom) {
+                Color.clear.frame(height: HomeDesign.Spacing.bottomInsetPadding)
             }
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            withAnimation(.easeInOut(duration: 4.5).repeatForever(autoreverses: true)) { backgroundBreathing.toggle() }
+            withAnimation(.easeInOut(duration: 5.2).repeatForever(autoreverses: true)) {
+                backgroundBreathing.toggle()
+            }
         }
         .sheet(item: $editingPreset) { preset in presetEditor(for: preset) }
         .sheet(isPresented: $isShowingSoundPicker) { soundPicker }
@@ -49,102 +60,123 @@ struct HomeView: View {
         }
     }
 
-    private var header: some View {
-        VStack(spacing: 8) {
-            Text("DreamNest")
-                .font(.system(size: 42, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            Text("Calm, premium sleep routines")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.7))
+    private var heroSection: some View {
+        VStack(spacing: HomeDesign.Spacing.small) {
+            VStack(spacing: 6) {
+                Text("DreamNest")
+                    .font(.system(size: 38, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Text("Quiet, reassuring sleep support for long nights.")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .multilineTextAlignment(.center)
+            }
+
+            HeroSleepButton(isActive: viewModel.isPlaying, action: toggleSleep)
+                .padding(.top, HomeDesign.Spacing.small)
         }
     }
 
     private var statusStrip: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: HomeDesign.Spacing.small) {
             StatusPill(text: statusMessage, isTriggered: isRecentlyTriggered)
+            Spacer(minLength: 0)
             Button {
                 isShowingHistory = true
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
-                    .padding(10)
-                    .background(Circle().fill(Color.white.opacity(0.12)))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.88))
+                    .frame(width: 40, height: 40)
+                    .background(
+                        Circle()
+                            .fill(HomeDesign.cardBackground)
+                            .overlay(Circle().strokeBorder(HomeDesign.stroke, lineWidth: 0.8))
+                    )
             }
             .buttonStyle(.plain)
         }
     }
 
-    private var timerPanel: some View {
-        VStack(spacing: 14) {
-            PremiumTimerStepper(timeText: viewModel.timerDurationFriendlyLabel) { delta in
-                softHaptic(style: .soft)
-                viewModel.adjustTimerDuration(minutesDelta: delta)
-            }
+    private var timerSection: some View {
+        VStack(alignment: .leading, spacing: HomeDesign.Spacing.small) {
+            sectionHeader("Timer", subtitle: "Settle in with the right session length")
+            TimerControlCard(
+                timeText: viewModel.timerDurationFriendlyLabel,
+                selectedTimerMinutes: selectedTimerMinutes,
+                quickPresets: quickPresets,
+                onAdjust: { delta in
+                    softHaptic(style: .soft)
+                    viewModel.adjustTimerDuration(minutesDelta: delta)
+                },
+                onQuickPreset: { preset in viewModel.applyTimerPreset(minutes: preset) }
+            )
+        }
+    }
 
-            HStack(spacing: 10) {
-                ForEach(quickPresets, id: \.self) { preset in
-                    QuickPresetButton(title: preset == 60 ? "1h" : preset == 120 ? "2h" : "\(preset)m", isActive: selectedTimerMinutes == preset) {
-                        viewModel.applyTimerPreset(minutes: preset)
+    private var presetsSection: some View {
+        VStack(alignment: .leading, spacing: HomeDesign.Spacing.small) {
+            sectionHeader("Presets", subtitle: "Start bedtime or nap with one tap")
+            HStack(spacing: HomeDesign.Spacing.small) {
+                ForEach([PlaybackPreset.bedtime, .nap], id: \.self) { preset in
+                    PresetCard(
+                        preset: preset,
+                        config: viewModel.quickPresetConfiguration(for: preset),
+                        sound: viewModel.quickPresetSound(for: preset),
+                        pinned: isPinned(preset),
+                        onTap: { Task { await viewModel.startPreset(preset) } },
+                        onLongPress: { editingPreset = preset }
+                    )
+                }
+            }
+        }
+    }
+
+    private var soundSection: some View {
+        VStack(alignment: .leading, spacing: HomeDesign.Spacing.small) {
+            sectionHeader("Sound", subtitle: "Choose what plays throughout this session")
+            SoundSelectionRow(sound: viewModel.selectedSound, isPlaying: viewModel.isPlaying) {
+                if !viewModel.isPlaying { viewModel.startDefaultRoutine() }
+            } longPressAction: {
+                isShowingSoundPicker = true
+            }
+        }
+    }
+
+    private var smartResettleSection: some View {
+        VStack(alignment: .leading, spacing: HomeDesign.Spacing.small) {
+            sectionHeader("Smart Resettle", subtitle: "On-device cry detection and gentle response")
+            SmartResettleCard(
+                isEnabled: Binding(
+                    get: { viewModel.cryModeEnabled },
+                    set: { enabled in
+                        if enabled { viewModel.prepareCryModeEnablement() } else { viewModel.toggleCryMode(false) }
                     }
-                }
-            }
+                ),
+                mode: Binding(get: { viewModel.cryComfortMode }, set: viewModel.setCryComfortMode)
+            )
         }
-        .padding(16)
-        .background(.ultraThinMaterial.opacity(0.25), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-
-    private var presetSection: some View {
-        HStack(spacing: 12) {
-            ForEach([PlaybackPreset.bedtime, .nap], id: \.self) { preset in
-                PremiumPresetCard(
-                    preset: preset,
-                    config: viewModel.quickPresetConfiguration(for: preset),
-                    sound: viewModel.quickPresetSound(for: preset),
-                    pinned: isPinned(preset)
-                ) {
-                    Task { await viewModel.startPreset(preset) }
-                } onLongPress: {
-                    editingPreset = preset
-                }
-            }
-        }
-    }
-
-    private var soundSelector: some View {
-        SoundSelectionSummaryView(sound: viewModel.selectedSound, isPlaying: viewModel.isPlaying) {
-            if !viewModel.isPlaying { viewModel.startDefaultRoutine() }
-        } longPressAction: {
-            isShowingSoundPicker = true
-        }
-    }
-
-    private var cryConfidencePanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Smart Resettle")
-                    .font(.headline)
-                Spacer()
-                Toggle("", isOn: Binding(get: { viewModel.cryModeEnabled }, set: { enabled in
-                    if enabled { viewModel.prepareCryModeEnablement() } else { viewModel.toggleCryMode(false) }
-                }))
-                .labelsHidden()
-            }
-            Picker("Mode", selection: Binding(get: { viewModel.cryComfortMode }, set: viewModel.setCryComfortMode)) {
-                ForEach(CryComfortMode.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
-            }
-            .pickerStyle(.segmented)
-            Text("Microphone processing stays on-device, and Smart Resettle history stays local on this phone.")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.7))
-        }
-        .padding(14)
-        .background(.ultraThinMaterial.opacity(0.2), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var trustSignals: some View {
         Text("Designed for safe, restful sleep")
             .font(.footnote)
-            .foregroundStyle(.white.opacity(0.72))
+            .foregroundStyle(.white.opacity(0.68))
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private func sectionHeader(_ title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.62))
+        }
     }
 
     private func presetEditor(for preset: PlaybackPreset) -> some View {
@@ -160,7 +192,16 @@ struct HomeView: View {
             maxAutoResettles: config.maxAutoResettles,
             sounds: soundCatalog,
             onSave: { soundID, minutes, cryEnabled, smartEnabled, listeningMinutes, resettleMinutes, maxCount in
-                viewModel.updateQuickPreset(preset, durationMinutes: minutes, cryModeEnabled: cryEnabled, soundID: soundID, smartResettleEnabled: smartEnabled, listeningWindowMinutes: listeningMinutes, resettleDurationMinutes: resettleMinutes, maxAutoResettles: maxCount)
+                viewModel.updateQuickPreset(
+                    preset,
+                    durationMinutes: minutes,
+                    cryModeEnabled: cryEnabled,
+                    soundID: soundID,
+                    smartResettleEnabled: smartEnabled,
+                    listeningWindowMinutes: listeningMinutes,
+                    resettleDurationMinutes: resettleMinutes,
+                    maxAutoResettles: maxCount
+                )
             }
         )
     }
@@ -192,44 +233,131 @@ struct HomeView: View {
     }
 }
 
-private struct PremiumTimerStepper: View {
+private enum HomeDesign {
+    enum Spacing {
+        static let heroTop: CGFloat = 14
+        static let screen: CGFloat = 20
+        static let sectionLarge: CGFloat = 22
+        static let section: CGFloat = 18
+        static let small: CGFloat = 10
+        static let bottomClearance: CGFloat = 28
+        static let bottomInsetPadding: CGFloat = 8
+    }
+
+    enum Radius {
+        static let card: CGFloat = 24
+        static let control: CGFloat = 16
+        static let capsule: CGFloat = 999
+    }
+
+    static let cardBackground =
+        LinearGradient(colors: [Color.white.opacity(0.11), Color.white.opacity(0.06)], startPoint: .topLeading, endPoint: .bottomTrailing)
+    static let stroke = Color.white.opacity(0.16)
+    static let subtleGlow = Color(hex: "C3C2FF").opacity(0.28)
+    static let heroGradient = LinearGradient(colors: [Color(hex: "4A5D95"), Color(hex: "202E55")], startPoint: .topLeading, endPoint: .bottomTrailing)
+}
+
+private struct HeroSleepButton: View {
+    let isActive: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                Image(systemName: isActive ? "moon.zzz.fill" : "moon.stars.fill")
+                    .font(.system(size: 28, weight: .medium))
+                Text(isActive ? "Sleeping…" : "Start Sleep")
+                    .font(.system(.title3, design: .rounded).weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .frame(width: 188, height: 188)
+            .background(
+                Circle()
+                    .fill(HomeDesign.heroGradient)
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.28), lineWidth: 1.1))
+            )
+            .shadow(color: HomeDesign.subtleGlow, radius: 26, y: 10)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct TimerControlCard: View {
     let timeText: String
+    let selectedTimerMinutes: Int
+    let quickPresets: [Int]
     let onAdjust: (Int) -> Void
+    let onQuickPreset: (Int) -> Void
+
     private let left = [-10, -5, -1]
     private let right = [1, 5, 10]
 
     var body: some View {
-        HStack(spacing: 8) {
-            ForEach(left, id: \.self) { delta in stepperButton(delta) }
-            Text(timeText)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-            ForEach(right, id: \.self) { delta in stepperButton(delta) }
+        VStack(spacing: 14) {
+            HStack(spacing: 6) {
+                ForEach(left, id: \.self) { delta in
+                    TimerAdjustButton(delta: delta) { onAdjust(delta) }
+                }
+
+                Text(timeText)
+                    .font(.system(size: 23, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                ForEach(right, id: \.self) { delta in
+                    TimerAdjustButton(delta: delta) { onAdjust(delta) }
+                }
+            }
+
+            HStack(spacing: 9) {
+                ForEach(quickPresets, id: \.self) { preset in
+                    QuickPresetButton(
+                        title: preset == 60 ? "1h" : preset == 120 ? "2h" : "\(preset)m",
+                        isActive: selectedTimerMinutes == preset,
+                        action: { onQuickPreset(preset) }
+                    )
+                }
+            }
         }
+        .padding(16)
+        .background(cardSurface)
     }
 
-    private func stepperButton(_ delta: Int) -> some View {
-        PressRepeatButton(title: delta > 0 ? "+\(delta)" : "\(delta)") { onAdjust(delta) }
+    private var cardSurface: some View {
+        RoundedRectangle(cornerRadius: HomeDesign.Radius.card, style: .continuous)
+            .fill(HomeDesign.cardBackground)
+            .overlay(RoundedRectangle(cornerRadius: HomeDesign.Radius.card, style: .continuous).stroke(HomeDesign.stroke, lineWidth: 0.9))
+            .shadow(color: .black.opacity(0.22), radius: 12, y: 8)
     }
 }
 
-private struct PressRepeatButton: View {
-    let title: String
+private struct TimerAdjustButton: View {
+    let delta: Int
     let action: () -> Void
     @State private var task: Task<Void, Never>?
 
+    private var title: String { delta > 0 ? "+\(delta)" : "\(delta)" }
+
     var body: some View {
         Text(title)
-            .font(.system(size: 14, weight: .semibold, design: .rounded))
-            .padding(.horizontal, 10)
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.95)
+            .foregroundStyle(.white.opacity(0.95))
+            .frame(minWidth: 40)
+            .padding(.horizontal, 8)
             .padding(.vertical, 9)
             .background(Capsule().fill(Color.white.opacity(0.12)))
-            .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
+            .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 1))
             .contentShape(Capsule())
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { _ in if task == nil { start() } }
-                .onEnded { _ in stop(fire: true) })
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in if task == nil { start() } }
+                    .onEnded { _ in stop(fire: true) }
+            )
             .onDisappear { task?.cancel() }
     }
 
@@ -252,7 +380,7 @@ private struct PressRepeatButton: View {
     }
 }
 
-private struct PremiumPresetCard: View {
+private struct PresetCard: View {
     let preset: PlaybackPreset
     let config: QuickStartPresetSettings
     let sound: SoundDefinition
@@ -266,19 +394,151 @@ private struct PremiumPresetCard: View {
                 HStack {
                     Label(preset.title, systemImage: preset == .bedtime ? "moon.stars.fill" : "cloud.sun.fill")
                     Spacer()
-                    if pinned { Image(systemName: "pin.fill").foregroundStyle(Color(hex: "E4A890")) }
+                    if pinned {
+                        Image(systemName: "pin.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color(hex: "E4A890"))
+                    }
                 }
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
                 Text(sound.title)
-                    .font(.subheadline.weight(.semibold))
-                Text("\(Int(config.duration/60)) min • Smart \(config.smartResettleEnabled ? "On" : "Off")")
+                    .font(.headline)
+                Text("\(Int(config.duration / 60)) min • Smart \(config.smartResettleEnabled ? "On" : "Off")")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
             }
             .foregroundStyle(.white)
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial.opacity(0.22), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(cardSurface)
+        }
+    }
+
+    private var cardSurface: some View {
+        RoundedRectangle(cornerRadius: HomeDesign.Radius.card, style: .continuous)
+            .fill(HomeDesign.cardBackground)
+            .overlay(RoundedRectangle(cornerRadius: HomeDesign.Radius.card, style: .continuous).stroke(HomeDesign.stroke, lineWidth: 0.9))
+    }
+}
+
+private struct SmartResettleCard: View {
+    @Binding var isEnabled: Bool
+    @Binding var mode: CryComfortMode
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Auto-detect and respond", systemImage: "waveform.and.mic")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Toggle("", isOn: $isEnabled)
+                    .labelsHidden()
+            }
+
+            Picker("Mode", selection: $mode) {
+                ForEach(CryComfortMode.allCases, id: \.self) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text("Microphone processing stays on-device. Smart Resettle history remains local on this iPhone.")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.66))
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: HomeDesign.Radius.card, style: .continuous)
+                .fill(HomeDesign.cardBackground)
+                .overlay(RoundedRectangle(cornerRadius: HomeDesign.Radius.card, style: .continuous).stroke(HomeDesign.stroke, lineWidth: 0.9))
+        )
+    }
+}
+
+private struct DreamGradientBackground: View {
+    @Binding var isBreathing: Bool
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "050A16"), Color(hex: "111B35"), Color(hex: "2D2956")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [Color(hex: "A9A6FF").opacity(isBreathing ? 0.26 : 0.16), .clear],
+                center: .top,
+                startRadius: 30,
+                endRadius: isBreathing ? 320 : 250
+            )
+            .blur(radius: 36)
+
+            RadialGradient(
+                colors: [Color(hex: "D9C8FF").opacity(isBreathing ? 0.14 : 0.08), .clear],
+                center: .bottom,
+                startRadius: 20,
+                endRadius: isBreathing ? 360 : 290
+            )
+            .blur(radius: 26)
+        }
+    }
+}
+
+private struct QuickPresetButton: View {
+    let title: String
+    let isActive: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.95))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background(Capsule().fill(Color.white.opacity(isActive ? 0.24 : 0.1)))
+                .overlay(Capsule().stroke(Color.white.opacity(isActive ? 0.26 : 0.12), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct SoundSelectionRow: View {
+    let sound: SoundDefinition
+    let isPlaying: Bool
+    let tapAction: () -> Void
+    let longPressAction: () -> Void
+
+    var body: some View {
+        SoundPressableTile(tapAction: tapAction, longPressAction: longPressAction) {
+            HStack(spacing: 12) {
+                let style = SoundVisualStyle.forSound(sound)
+                Image(systemName: style.icon)
+                    .font(.system(size: 17, weight: .semibold))
+                    .padding(11)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(style.primary.opacity(0.24)))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(style.title)
+                        .font(.headline)
+                    Text(style.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.68))
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.58))
+            }
+            .foregroundStyle(.white)
+            .padding(15)
+            .background(
+                RoundedRectangle(cornerRadius: HomeDesign.Radius.card, style: .continuous)
+                    .fill(HomeDesign.cardBackground)
+                    .overlay(RoundedRectangle(cornerRadius: HomeDesign.Radius.card, style: .continuous).stroke(HomeDesign.stroke, lineWidth: 0.9))
+            )
         }
     }
 }
@@ -333,73 +593,6 @@ private struct CryModeOnboardingView: View {
     }
 }
 
-private struct DreamGradientBackground: View {
-    @Binding var isBreathing: Bool
-    var body: some View {
-        ZStack {
-            LinearGradient(colors: [Color(hex: "0B1C2C"), Color(hex: "2E335D"), Color(hex: "6E5E64")], startPoint: .top, endPoint: .bottom)
-            RadialGradient(colors: [Color(hex: "E4A890").opacity(isBreathing ? 0.38 : 0.24), .clear], center: .center, startRadius: 18, endRadius: isBreathing ? 360 : 280).blur(radius: 30)
-        }
-    }
-}
-
-private struct SleepButton: View {
-    let isActive: Bool
-    let size: CGFloat
-    let action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: isActive ? "moon.zzz.fill" : "moon.stars.fill")
-                Text(isActive ? "Sleeping..." : "Start Sleep")
-            }
-            .font(.system(.title3, design: .rounded).weight(.semibold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(Circle().fill(LinearGradient(colors: [Color(hex: "2A3E62"), Color(hex: "141F36")], startPoint: .topLeading, endPoint: .bottomTrailing)))
-            .shadow(color: Color(hex: "E4A890").opacity(0.36), radius: 18, y: 6)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct QuickPresetButton: View {
-    let title: String
-    let isActive: Bool
-    let action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            Text(title).font(.caption.weight(.semibold)).padding(.horizontal, 12).padding(.vertical, 8)
-                .background(Capsule().fill(Color.white.opacity(isActive ? 0.24 : 0.1)))
-        }.buttonStyle(.plain)
-    }
-}
-
-private struct SoundSelectionSummaryView: View {
-    let sound: SoundDefinition
-    let isPlaying: Bool
-    let tapAction: () -> Void
-    let longPressAction: () -> Void
-
-    var body: some View {
-        SoundPressableTile(tapAction: tapAction, longPressAction: longPressAction) {
-            HStack {
-                let style = SoundVisualStyle.forSound(sound)
-                Image(systemName: style.icon).padding(10).background(RoundedRectangle(cornerRadius: 12).fill(style.primary.opacity(0.24)))
-                VStack(alignment: .leading) {
-                    Text(style.title).font(.headline)
-                    Text(style.subtitle).font(.caption).foregroundStyle(.white.opacity(0.7))
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-            }
-            .foregroundStyle(.white)
-            .padding(14)
-            .background(.ultraThinMaterial.opacity(0.24), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-    }
-}
-
 private struct SoundPickerSheet: View {
     let sounds: [SoundDefinition]
     let selectedSoundID: String
@@ -432,6 +625,7 @@ private struct SoundTileView: View {
     let sound: SoundDefinition
     let isSelected: Bool
     let action: () -> Void
+
     var body: some View {
         let style = SoundVisualStyle.forSound(sound)
         return Button(action: action) {
@@ -497,8 +691,11 @@ private struct SoundPressableTile<Content: View>: View {
     let longPressAction: () -> Void
     var longPressDuration: Double = 0.5
     @ViewBuilder let content: () -> Content
+
     var body: some View {
-        content().onTapGesture(perform: tapAction).onLongPressGesture(minimumDuration: longPressDuration, perform: longPressAction)
+        content()
+            .onTapGesture(perform: tapAction)
+            .onLongPressGesture(minimumDuration: longPressDuration, perform: longPressAction)
     }
 }
 
@@ -508,6 +705,7 @@ private struct SoundVisualStyle {
     let subtitle: String
     let primary: Color
     let background: Color
+
     static func forSound(_ sound: SoundDefinition) -> SoundVisualStyle {
         let id = sound.id.lowercased()
         if id.contains("rain") { return .init(icon: "cloud.rain.fill", title: "Rain", subtitle: "Soft rainfall", primary: Color(hex: "9AB4D8"), background: Color(hex: "354A62")) }
@@ -521,9 +719,15 @@ private struct SoundVisualStyle {
 private struct StatusPill: View {
     let text: String
     let isTriggered: Bool
+
     var body: some View {
-        Text(text).font(.footnote.weight(.medium)).foregroundStyle(.white).padding(.horizontal, 14).padding(.vertical, 10)
+        Text(text)
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
             .background(Capsule().fill((isTriggered ? Color(hex: "E4A890") : Color(hex: "9BC4FF")).opacity(0.2)))
+            .overlay(Capsule().stroke(Color.white.opacity(0.16), lineWidth: 0.8))
     }
 }
 
@@ -537,7 +741,7 @@ private extension Color {
         case 6: (r, g, b) = (int >> 16, int >> 8 & 0xFF, int & 0xFF)
         default: (r, g, b) = (245, 247, 250)
         }
-        self.init(.sRGB, red: Double(r)/255, green: Double(g)/255, blue: Double(b)/255, opacity: 1)
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: 1)
     }
 }
 
