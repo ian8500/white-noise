@@ -29,6 +29,7 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var recentCryEvents: [CryEventRow] = []
     @Published private(set) var smartResettleSession: SmartResettleSession?
     @Published private(set) var smartResettleStatusLabel = "Ready for rest"
+    @Published private(set) var activeQuickPreset: PlaybackPreset?
     @Published private(set) var favoriteSoundIDs: Set<String>
     @Published private(set) var recentSoundIDs: [String]
     @Published private(set) var routinePresets: [RoutinePreset]
