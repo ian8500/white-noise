@@ -19,6 +19,7 @@
 		527B615A25DBA774DB83C3D4 /* NoiseSafetyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2084875C361E6FC1CD50C874 /* NoiseSafetyPolicy.swift */; };
 		5B0E8DA84F363922AFD3FF0C /* SleepTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989E04F38163DD999B4AA05D /* SleepTimerEngine.swift */; };
 		5CD8CBDCD55B6E0B85593F38 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95E74AD2E6BF3DA3D719D24A /* HomeView.swift */; };
+		5F2A9D7F3C9E4B1A8D6C2E11 /* HomeUIComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7F1C2D3E4A596877889900 /* HomeUIComponents.swift */; };
 		6F7A8B9C0D1E2F3041526374 /* PresetCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F7A8B9C0D1E2F3041526373 /* PresetCard.swift */; };
 		7C8D9E0F1A2B3C4D5E6F7081 /* SmartResettleCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C8D9E0F1A2B3C4D5E6F7080 /* SmartResettleCard.swift */; };
 		843D5D272F89216A0038D41E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 843D5D262F89216A0038D41E /* Assets.xcassets */; };
