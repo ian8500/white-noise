@@ -10,6 +10,7 @@ struct HomeView: View {
     @State private var editingPreset: PlaybackPreset?
     @State private var isShowingSoundPicker = false
     @State private var isShowingHistory = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let quickPresets = [30, 45, 60, 120]
     
@@ -48,9 +49,9 @@ struct HomeView: View {
                 .safeAreaPadding(.bottom, HomeLayout.bottomSafeAreaPadding)
             }
         }
-        .preferredColorScheme(.dark)
         .onAppear {
-            withAnimation(.easeInOut(duration: 4.5).repeatForever(autoreverses: true)) { backgroundBreathing.toggle() }
+            let animation = Animation.easeInOut(duration: reduceMotion ? 8 : 5.6).repeatForever(autoreverses: true)
+            withAnimation(animation) { backgroundBreathing.toggle() }
         }
         .sheet(item: $editingPreset) { preset in presetEditor(for: preset) }
         .sheet(isPresented: $isShowingSoundPicker) { soundPicker }
@@ -68,25 +69,34 @@ struct HomeView: View {
     private var header: some View {
         VStack(spacing: 8) {
             Text("DreamNest")
-                .font(.system(size: 42, weight: .bold, design: .rounded))
+                .font(.system(size: 38, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
+                .minimumScaleFactor(0.9)
             Text("Calm, premium sleep routines")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.72))
         }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 6)
     }
 
     private var statusStrip: some View {
         HStack(spacing: 10) {
             StatusPill(text: statusMessage, isTriggered: isRecentlyTriggered)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             Button {
                 isShowingHistory = true
             } label: {
-                Image(systemName: "clock.arrow.circlepath")
-                    .padding(10)
+                Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(12)
                     .background(Circle().fill(Color.white.opacity(0.12)))
             }
-            .buttonStyle(.plain)
+            .minimumHitTarget()
+            .buttonStyle(CalmScaleButtonStyle())
+            .accessibilityLabel("Open Smart Resettle history")
         }
     }
 
@@ -130,7 +140,9 @@ struct HomeView: View {
 
     private var soundSelector: some View {
         SoundSelectionSummaryView(sound: viewModel.selectedSound, isPlaying: viewModel.isPlaying) {
-            if !viewModel.isPlaying { viewModel.startDefaultRoutine() }
+            if !viewModel.isPlaying {
+                viewModel.startDefaultRoutine()
+            }
         } longPressAction: {
             isShowingSoundPicker = true
         }
@@ -150,8 +162,9 @@ struct HomeView: View {
 
     private var trustSignals: some View {
         Text("Designed for safe, restful sleep")
-            .font(.footnote)
-            .foregroundStyle(.white.opacity(0.72))
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(.white.opacity(0.7))
+            .padding(.vertical, 4)
     }
 
     private func presetEditor(for preset: PlaybackPreset) -> some View {
@@ -205,14 +218,14 @@ struct HomeView: View {
     }
 
     private func toggleSleep() {
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(.easeInOut(duration: 0.28)) {
             viewModel.isPlaying ? viewModel.stopPlayback() : viewModel.startDefaultRoutine()
         }
     }
 
     private func softHaptic(style: UIImpactFeedbackGenerator.FeedbackStyle) {
 #if os(iOS)
-        UIImpactFeedbackGenerator(style: style).impactOccurred(intensity: 0.85)
+        UIImpactFeedbackGenerator(style: style).impactOccurred(intensity: 0.8)
 #endif
     }
 }
@@ -379,10 +392,22 @@ private struct CryModeOnboardingView: View {
 
 private struct DreamGradientBackground: View {
     @Binding var isBreathing: Bool
+
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(hex: "0B1C2C"), Color(hex: "2E335D"), Color(hex: "6E5E64")], startPoint: .top, endPoint: .bottom)
-            RadialGradient(colors: [Color(hex: "E4A890").opacity(isBreathing ? 0.38 : 0.24), .clear], center: .center, startRadius: 18, endRadius: isBreathing ? 360 : 280).blur(radius: 30)
+            LinearGradient(
+                colors: [Color(hex: "0B1C2C"), Color(hex: "2A3258"), Color(hex: "5E5563")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            RadialGradient(
+                colors: [Color(hex: "E4A890").opacity(isBreathing ? 0.28 : 0.18), .clear],
+                center: .center,
+                startRadius: 20,
+                endRadius: isBreathing ? 350 : 280
+            )
+            .blur(radius: 32)
         }
     }
 }
@@ -391,19 +416,29 @@ private struct SleepButton: View {
     let isActive: Bool
     let size: CGFloat
     let action: () -> Void
+
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 Image(systemName: isActive ? "moon.zzz.fill" : "moon.stars.fill")
-                Text(isActive ? "Sleeping..." : "Start Sleep")
+                    .font(.system(size: 26, weight: .semibold))
+                Text(isActive ? "Sleeping…" : "Start Sleep")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
             }
-            .font(.system(.title3, design: .rounded).weight(.semibold))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(Circle().fill(LinearGradient(colors: [Color(hex: "2A3E62"), Color(hex: "141F36")], startPoint: .topLeading, endPoint: .bottomTrailing)))
-            .shadow(color: Color(hex: "E4A890").opacity(0.36), radius: 18, y: 6)
+            .background(
+                Circle()
+                    .fill(LinearGradient(colors: [Color(hex: "2C426A"), Color(hex: "18243F")], startPoint: .topLeading, endPoint: .bottomTrailing))
+            )
+            .overlay(
+                Circle().stroke(Color.white.opacity(0.16), lineWidth: 1)
+            )
+            .shadow(color: Color(hex: "E4A890").opacity(0.24), radius: 16, y: 6)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CalmScaleButtonStyle())
+        .minimumHitTarget()
+        .accessibilityHint(isActive ? "Stops current routine" : "Starts default sleep routine")
     }
 }
 
@@ -411,11 +446,23 @@ private struct QuickPresetButton: View {
     let title: String
     let isActive: Bool
     let action: () -> Void
+
     var body: some View {
         Button(action: action) {
-            Text(title).font(.caption.weight(.semibold)).padding(.horizontal, 12).padding(.vertical, 8)
-                .background(Capsule().fill(Color.white.opacity(isActive ? 0.24 : 0.1)))
-        }.buttonStyle(.plain)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: HomeLayout.minimumTapTarget)
+                .background(
+                    Capsule().fill(Color.white.opacity(isActive ? 0.22 : 0.1))
+                )
+                .overlay(
+                    Capsule().stroke(Color.white.opacity(isActive ? 0.26 : 0.1), lineWidth: 1)
+                )
+        }
+        .buttonStyle(CalmScaleButtonStyle())
+        .minimumHitTarget()
     }
 }
 
@@ -427,19 +474,29 @@ private struct SoundSelectionSummaryView: View {
 
     var body: some View {
         SoundPressableTile(tapAction: tapAction, longPressAction: longPressAction) {
-            HStack {
+            HStack(spacing: 12) {
                 let style = SoundVisualStyle.forSound(sound)
-                Image(systemName: style.icon).padding(10).background(RoundedRectangle(cornerRadius: 12).fill(style.primary.opacity(0.24)))
-                VStack(alignment: .leading) {
+                Image(systemName: style.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(style.primary.opacity(0.24)))
+
+                VStack(alignment: .leading, spacing: 3) {
                     Text(style.title).font(.headline)
-                    Text(style.subtitle).font(.caption).foregroundStyle(.white.opacity(0.7))
+                    Text(style.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.72))
                 }
+
                 Spacer()
+
                 Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.7))
             }
             .foregroundStyle(.white)
-            .padding(14)
-            .background(.ultraThinMaterial.opacity(0.24), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .homeCard(opacity: 0.24)
         }
     }
 }
@@ -476,6 +533,7 @@ private struct SoundTileView: View {
     let sound: SoundDefinition
     let isSelected: Bool
     let action: () -> Void
+
     var body: some View {
         let style = SoundVisualStyle.forSound(sound)
         return Button(action: action) {
@@ -490,7 +548,7 @@ private struct SoundTileView: View {
             .background(style.background.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(isSelected ? style.primary : .white.opacity(0.14), lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CalmScaleButtonStyle())
     }
 }
 
@@ -541,8 +599,17 @@ private struct SoundPressableTile<Content: View>: View {
     let longPressAction: () -> Void
     var longPressDuration: Double = 0.5
     @ViewBuilder let content: () -> Content
+
     var body: some View {
-        content().onTapGesture(perform: tapAction).onLongPressGesture(minimumDuration: longPressDuration, perform: longPressAction)
+        Button(action: tapAction) {
+            content()
+        }
+        .buttonStyle(CalmScaleButtonStyle())
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: longPressDuration).onEnded { _ in
+                longPressAction()
+            }
+        )
     }
 }
 
@@ -552,11 +619,12 @@ private struct SoundVisualStyle {
     let subtitle: String
     let primary: Color
     let background: Color
+
     static func forSound(_ sound: SoundDefinition) -> SoundVisualStyle {
         let id = sound.id.lowercased()
         if id.contains("rain") { return .init(icon: "cloud.rain.fill", title: "Rain", subtitle: "Soft rainfall", primary: Color(hex: "9AB4D8"), background: Color(hex: "354A62")) }
-        if id.contains("white") { return .init(icon: "waveform.path", title: "White Noise", subtitle: "Airy masking hush", primary: Color(hex: "D4DFEA"), background: Color(hex: "4A5363")) }
-        if id.contains("pink") { return .init(icon: "circle.hexagongrid.fill", title: sound.title, subtitle: "Warm blanket noise", primary: Color(hex: "E0B7C0"), background: Color(hex: "5A3F53")) }
+        if id.contains("white") { return .init(icon: "waveform", title: "White Noise", subtitle: "Airy masking hush", primary: Color(hex: "D4DFEA"), background: Color(hex: "4A5363")) }
+        if id.contains("pink") { return .init(icon: "waveform.path.ecg", title: sound.title, subtitle: "Warm blanket noise", primary: Color(hex: "E0B7C0"), background: Color(hex: "5A3F53")) }
         if id.contains("fire") { return .init(icon: "flame.fill", title: "Fire", subtitle: "Cozy ember crackle", primary: Color(hex: "E4A890"), background: Color(hex: "5B4138")) }
         return .init(icon: "sparkles", title: sound.title, subtitle: "Calm ambience", primary: Color(hex: "B4BDD3"), background: Color(hex: "39435A"))
     }
@@ -565,9 +633,17 @@ private struct SoundVisualStyle {
 private struct StatusPill: View {
     let text: String
     let isTriggered: Bool
+
     var body: some View {
-        Text(text).font(.footnote.weight(.medium)).foregroundStyle(.white).padding(.horizontal, 14).padding(.vertical, 10)
+        Text(text)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
             .background(Capsule().fill((isTriggered ? Color(hex: "E4A890") : Color(hex: "9BC4FF")).opacity(0.2)))
+            .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
     }
 }
 
@@ -581,7 +657,7 @@ private extension Color {
         case 6: (r, g, b) = (int >> 16, int >> 8 & 0xFF, int & 0xFF)
         default: (r, g, b) = (245, 247, 250)
         }
-        self.init(.sRGB, red: Double(r)/255, green: Double(g)/255, blue: Double(b)/255, opacity: 1)
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: 1)
     }
 }
 
