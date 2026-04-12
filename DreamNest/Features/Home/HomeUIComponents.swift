@@ -2,9 +2,14 @@ import SwiftUI
 
 struct HomeLayout {
     static let horizontalPadding: CGFloat = 20
-    static let sectionSpacing: CGFloat = 14
+    static let sectionSpacing: CGFloat = 18
     static let cardCornerRadius: CGFloat = 20
     static let minimumTapTarget: CGFloat = 44
+    static let topSafeAreaPadding: CGFloat = 18
+    static let bottomSafeAreaPadding: CGFloat = 28
+    static let headerBottomSpacing: CGFloat = 4
+    static let heroBottomSpacing: CGFloat = 6
+    static let footerTopSpacing: CGFloat = 2
 }
 
 struct HomeCardModifier: ViewModifier {

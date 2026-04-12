@@ -13,16 +13,6 @@ struct HomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let quickPresets = [30, 45, 60, 120]
-    
-    private enum HomeLayout {
-        static let horizontalPadding: CGFloat = 20
-        static let sectionSpacing: CGFloat = 18
-        static let topSafeAreaPadding: CGFloat = 18
-        static let bottomSafeAreaPadding: CGFloat = 28
-        static let headerBottomSpacing: CGFloat = 4
-        static let heroBottomSpacing: CGFloat = 6
-        static let footerTopSpacing: CGFloat = 2
-    }
 
     var body: some View {
         ZStack {
