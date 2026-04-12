@@ -137,26 +137,15 @@ struct HomeView: View {
     }
 
     private var cryConfidencePanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Smart Resettle")
-                    .font(.headline)
-                Spacer()
-                Toggle("", isOn: Binding(get: { viewModel.cryModeEnabled }, set: { enabled in
-                    if enabled { viewModel.prepareCryModeEnablement() } else { viewModel.toggleCryMode(false) }
-                }))
-                .labelsHidden()
+        SmartResettleCard(
+            isEnabled: Binding(get: { viewModel.cryModeEnabled }, set: { enabled in
+                if enabled { viewModel.prepareCryModeEnablement() } else { viewModel.toggleCryMode(false) }
+            }),
+            mode: Binding(get: { viewModel.cryComfortMode }, set: viewModel.setCryComfortMode),
+            onToggleChanged: { enabled in
+                if enabled { viewModel.prepareCryModeEnablement() } else { viewModel.toggleCryMode(false) }
             }
-            Picker("Mode", selection: Binding(get: { viewModel.cryComfortMode }, set: viewModel.setCryComfortMode)) {
-                ForEach(CryComfortMode.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
-            }
-            .pickerStyle(.segmented)
-            Text("Microphone processing stays on-device, and Smart Resettle history stays local on this phone.")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.7))
-        }
-        .padding(14)
-        .background(.ultraThinMaterial.opacity(0.2), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        )
     }
 
     private var trustSignals: some View {
