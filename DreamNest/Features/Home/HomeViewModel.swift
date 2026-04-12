@@ -19,6 +19,8 @@ final class HomeViewModel: ObservableObject {
     @Published var warningBanner: String?
     @Published var cryModeEnabled: Bool
     @Published var cryDetectionThreshold: Float
+    @Published var cryComfortMode: CryComfortMode
+    @Published var showCryOnboarding = false
     @Published private(set) var isCryMonitoringActive = false
     @Published private(set) var lastCryDetectionTime: Date?
     @Published private(set) var lastCryConfidence: Float?
@@ -84,6 +86,7 @@ final class HomeViewModel: ObservableObject {
         volume = safetyPolicy.clamped(volume: self.systemVolume.currentVolume)
         cryModeEnabled = settings.cryResponse.enabled
         cryDetectionThreshold = settings.cryResponse.detectionThreshold
+        cryComfortMode = settings.cryResponse.comfortMode
         favoriteSoundIDs = settings.favoriteSoundIDs
         recentSoundIDs = settings.recentSoundIDs
         recentCryEvents = store.loadCryEvents(limit: 200).map(CryEventRow.init)
@@ -448,6 +451,45 @@ final class HomeViewModel: ObservableObject {
         store.save(settings)
     }
 
+    func setCryComfortMode(_ mode: CryComfortMode) {
+        cryComfortMode = mode
+        settings.cryResponse.comfortMode = mode
+        setCryDetectionThreshold(mode.threshold)
+    }
+
+    func prepareCryModeEnablement() {
+        if settings.cryResponse.hasSeenOnboarding {
+            toggleCryMode(true)
+        } else {
+            showCryOnboarding = true
+        }
+    }
+
+    func completeCryOnboarding(enableNow: Bool, mode: CryComfortMode) {
+        settings.cryResponse.hasSeenOnboarding = true
+        settings.cryResponse.comfortMode = mode
+        cryComfortMode = mode
+        showCryOnboarding = false
+        setCryDetectionThreshold(mode.threshold)
+        if enableNow {
+            toggleCryMode(true)
+        }
+        store.save(settings)
+    }
+
+    func runSmartResettleTest() {
+        guard let sound = catalog.first else { return }
+        Task {
+            appendSmartResettleEvent(.autoResettleStarted, preset: .nap, sound: sound, confidence: 0.85, duration: 60)
+            await startPlayback(sound: sound, duration: 60, micModeEnabled: true, sessionMode: .autoResettling)
+            appendSmartResettleEvent(.autoResettleEnded, preset: .nap, sound: sound, confidence: 0, duration: 60)
+        }
+    }
+
+    func clearSmartResettleHistory() {
+        clearCryEvents()
+    }
+
     private func syncRoutineSettings() {
         routinePresets = settings.routinePresets
         defaultRoutinePresetID = settings.defaultRoutinePresetID
@@ -655,7 +697,9 @@ final class HomeViewModel: ObservableObject {
     ) async {
         do {
             try audio.configureSession(micModeEnabled: micModeEnabled)
-            try await audio.play(sound: sound, volume: safetyPolicy.clamped(volume: volume))
+            let targetVolume = safetyPolicy.clamped(volume: volume)
+            try await audio.play(sound: sound, volume: max(0.05, targetVolume * 0.35))
+            audio.updateVolume(targetVolume, rampDuration: 0.9)
             timer.start(duration: duration, fadeDuration: settings.timer.fadeDuration)
             isPlaying = true
             if var session = smartResettleSession, let sessionMode {
@@ -775,7 +819,7 @@ final class HomeViewModel: ObservableObject {
         case .idle:
             smartResettleStatusLabel = "Ready for rest"
         case .playingPreset:
-            smartResettleStatusLabel = "\(session.preset.title) active"
+            smartResettleStatusLabel = "Sleep active"
         case .listeningForResettle:
             smartResettleStatusLabel = "Listening for resettle"
         case .autoResettling:
