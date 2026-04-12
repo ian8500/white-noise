@@ -33,6 +33,7 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var recentSoundIDs: [String]
     @Published private(set) var routinePresets: [RoutinePreset]
     @Published private(set) var defaultRoutinePresetID: UUID?
+    @Published private(set) var timerDurationMinutes: Int
 
     let catalog: [SoundDefinition]
 
@@ -103,6 +104,7 @@ final class HomeViewModel: ObservableObject {
 
         routinePresets = settings.routinePresets
         defaultRoutinePresetID = settings.defaultRoutinePresetID
+        timerDurationMinutes = Self.minutes(from: settings.timer.duration)
 
         bind()
         cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
@@ -132,7 +134,7 @@ final class HomeViewModel: ObservableObject {
         let config = quickPresetConfiguration(for: preset)
         let presetSound = quickPresetSound(for: preset)
         let sessionStart = dateProvider()
-        settings.timer.duration = config.duration
+        setTimerDuration(seconds: config.duration)
         selectSound(presetSound)
         let effectiveCryMode = config.cryModeEnabled || config.smartResettleEnabled
         toggleCryMode(effectiveCryMode)
@@ -285,7 +287,7 @@ final class HomeViewModel: ObservableObject {
             selectSound(sound)
         }
         setVolume(preset.volume)
-        settings.timer.duration = preset.timerDuration
+        setTimerDuration(seconds: preset.timerDuration)
         toggleCryMode(preset.cryModeEnabled)
         store.save(settings)
     }
@@ -374,17 +376,11 @@ final class HomeViewModel: ObservableObject {
     }
 
     func applyTimerPreset(minutes: Int) {
-        settings.timer.duration = TimeInterval(minutes * 60)
-        store.save(settings)
-        updateRunningTimerForDurationChange(targetDuration: settings.timer.duration)
+        setTimerDuration(minutes: minutes)
     }
 
     func adjustTimerDuration(minutesDelta: Int) {
-        let currentMinutes = Int(settings.timer.duration / 60)
-        let updatedMinutes = max(1, currentMinutes + minutesDelta)
-        settings.timer.duration = TimeInterval(updatedMinutes * 60)
-        store.save(settings)
-        updateRunningTimerForDurationChange(targetDuration: settings.timer.duration)
+        setTimerDuration(minutes: timerDurationMinutes + minutesDelta)
     }
 
     var formattedTimerRemaining: String {
@@ -397,6 +393,11 @@ final class HomeViewModel: ObservableObject {
 
     var configuredTimerDuration: TimeInterval {
         settings.timer.duration
+    }
+
+    var selectedTimerPresetMinutes: Int? {
+        let presets = [30, 45, 60, 120]
+        return presets.contains(timerDurationMinutes) ? timerDurationMinutes : nil
     }
 
     var timerCountdownTitle: String {
@@ -611,6 +612,26 @@ final class HomeViewModel: ObservableObject {
         let minutes = totalSeconds / 60
         let remainingSeconds = totalSeconds % 60
         return String(format: "%02d:%02d", minutes, remainingSeconds)
+    }
+
+    private func setTimerDuration(minutes: Int) {
+        let clampedMinutes = Self.clampTimerMinutes(minutes)
+        timerDurationMinutes = clampedMinutes
+        settings.timer.duration = TimeInterval(clampedMinutes * 60)
+        store.save(settings)
+        updateRunningTimerForDurationChange(targetDuration: settings.timer.duration)
+    }
+
+    private func setTimerDuration(seconds: TimeInterval) {
+        setTimerDuration(minutes: Self.minutes(from: seconds))
+    }
+
+    private static func clampTimerMinutes(_ minutes: Int) -> Int {
+        min(max(1, minutes), 24 * 60)
+    }
+
+    private static func minutes(from duration: TimeInterval) -> Int {
+        clampTimerMinutes(Int(duration / 60))
     }
 
     private func friendlyDuration(_ seconds: TimeInterval) -> String {
