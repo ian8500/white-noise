@@ -9,6 +9,13 @@ private let homeLogger = Logger(subsystem: "com.dreamnest.app", category: "Home"
 
 @MainActor
 final class HomeViewModel: ObservableObject {
+    enum SessionMode: Equatable {
+        case mainProgramme
+        case sleepPreset
+        case napPreset
+        case autoResettling
+    }
+
     private static let cryTriggeredSoundID = "white-noise"
     private static let defaultRoutineDuration: TimeInterval = 30 * 60
 
@@ -35,6 +42,7 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var routinePresets: [RoutinePreset]
     @Published private(set) var defaultRoutinePresetID: UUID?
     @Published private(set) var timerDurationMinutes: Int
+    @Published private(set) var activeSessionMode: SessionMode?
 
     let catalog: [SoundDefinition]
 
@@ -105,6 +113,7 @@ final class HomeViewModel: ObservableObject {
         routinePresets = settings.routinePresets
         defaultRoutinePresetID = settings.defaultRoutinePresetID
         timerDurationMinutes = Self.minutes(from: settings.timer.duration)
+        activeSessionMode = nil
 
         bind()
         cryService.updateDetectionThreshold(settings.cryResponse.detectionThreshold)
@@ -123,7 +132,13 @@ final class HomeViewModel: ObservableObject {
         activeQuickPreset = nil
         smartResettleSession = nil
         updateSmartResettleStatus()
-        startRoutine(sound: selectedSound, volume: volume, timerDuration: settings.timer.duration, cryModeEnabled: cryModeEnabled)
+        startRoutine(
+            sound: selectedSound,
+            volume: volume,
+            timerDuration: settings.timer.duration,
+            cryModeEnabled: cryModeEnabled,
+            sessionMode: .mainProgramme
+        )
     }
 
     func startDefaultRoutine() {
@@ -162,6 +177,9 @@ final class HomeViewModel: ObservableObject {
             micModeEnabled: effectiveCryMode,
             sessionMode: .playingPreset
         )
+        if isPlaying {
+            activeSessionMode = preset == .bedtime ? .sleepPreset : .napPreset
+        }
     }
 
     func quickPresetConfiguration(for preset: PlaybackPreset) -> QuickStartPresetSettings {
@@ -235,7 +253,13 @@ final class HomeViewModel: ObservableObject {
         activeQuickPreset = nil
         smartResettleSession = nil
         updateSmartResettleStatus()
-        startRoutine(sound: selectedSound, volume: volume, timerDuration: settings.timer.duration, cryModeEnabled: cryModeEnabled)
+        startRoutine(
+            sound: selectedSound,
+            volume: volume,
+            timerDuration: settings.timer.duration,
+            cryModeEnabled: cryModeEnabled,
+            sessionMode: .mainProgramme
+        )
     }
 
     func saveCurrentAsPreset(named name: String) {
@@ -313,6 +337,7 @@ final class HomeViewModel: ObservableObject {
         playbackSessionStore.clear()
         await audio.stop(fadeDuration: 0.3)
         isPlaying = false
+        activeSessionMode = nil
         smartResettleSession = nil
         activeQuickPreset = nil
         updateSmartResettleStatus()
@@ -332,6 +357,11 @@ final class HomeViewModel: ObservableObject {
     }
 
     func selectSound(_ sound: SoundDefinition) {
+        let previousSoundID = selectedSound.id
+        if previousSoundID == sound.id {
+            return
+        }
+
         selectedSound = sound
         settings.lastSoundID = sound.id
         settings.recentSoundIDs.removeAll(where: { $0 == sound.id })
@@ -341,6 +371,11 @@ final class HomeViewModel: ObservableObject {
         store.save(settings)
 
         guard isPlaying else { return }
+
+        if var session = smartResettleSession {
+            session.sound = sound
+            smartResettleSession = session
+        }
 
         Task { [weak self] in
             guard let self else { return }
@@ -427,6 +462,45 @@ final class HomeViewModel: ObservableObject {
         return isCryMonitoringActive ? "On" : "Unavailable"
     }
 
+    var mainButtonIsActive: Bool {
+        isPlaying && activeSessionMode == .mainProgramme
+    }
+
+    var mainButtonTitle: String {
+        mainButtonIsActive ? "Sleeping…" : "Start Sleep"
+    }
+
+    func isPresetActive(_ preset: PlaybackPreset) -> Bool {
+        guard isPlaying else { return false }
+        switch (preset, activeSessionMode) {
+        case (.bedtime, .sleepPreset), (.nap, .napPreset):
+            return true
+        default:
+            return false
+        }
+    }
+
+    func presetButtonTitle(for preset: PlaybackPreset) -> String {
+        guard isPresetActive(preset) else { return preset.title }
+        return preset == .bedtime ? "Sleeping…" : "Napping…"
+    }
+
+    func handleMainSleepButtonTap() {
+        if mainButtonIsActive {
+            stopPlayback()
+            return
+        }
+        startDefaultRoutine()
+    }
+
+    func handlePresetButtonTap(_ preset: PlaybackPreset) async {
+        if isPresetActive(preset) {
+            stopPlayback()
+            return
+        }
+        await startPreset(preset)
+    }
+
     var cryCooldownStatusLabel: String {
         guard cryModeEnabled else { return "Monitoring off" }
         if cryCooldownRemaining <= 0 { return "Ready" }
@@ -505,12 +579,29 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func startRoutine(sound: SoundDefinition, volume: Float, timerDuration: TimeInterval, cryModeEnabled: Bool) {
+        startRoutine(
+            sound: sound,
+            volume: volume,
+            timerDuration: timerDuration,
+            cryModeEnabled: cryModeEnabled,
+            sessionMode: .mainProgramme
+        )
+    }
+
+    private func startRoutine(
+        sound: SoundDefinition,
+        volume: Float,
+        timerDuration: TimeInterval,
+        cryModeEnabled: Bool,
+        sessionMode: SessionMode
+    ) {
         Task {
             do {
                 try audio.configureSession(micModeEnabled: cryModeEnabled)
                 try await audio.play(sound: sound, volume: safetyPolicy.clamped(volume: volume))
                 timer.start(duration: timerDuration, fadeDuration: settings.timer.fadeDuration)
                 isPlaying = true
+                activeSessionMode = sessionMode
                 if var session = smartResettleSession {
                     session.mode = .playingPreset
                     smartResettleSession = session
@@ -518,6 +609,7 @@ final class HomeViewModel: ObservableObject {
                 updateSmartResettleStatus()
             } catch {
                 isPlaying = false
+                activeSessionMode = nil
                 warningBanner = "Playback failed: \(error.localizedDescription)"
                 homeLogger.error("quickStart failed: \(error.localizedDescription, privacy: .public)")
             }
@@ -536,6 +628,7 @@ final class HomeViewModel: ObservableObject {
                 if didTimerComplete {
                     _ = self.advancePlaybackGeneration()
                     self.isPlaying = false
+                    self.activeSessionMode = nil
                     self.playbackSessionStore.clear()
                     if self.smartResettleSession != nil {
                         Task { await self.handlePresetTimerCompletion() }
@@ -730,6 +823,20 @@ final class HomeViewModel: ObservableObject {
             audio.updateVolume(targetVolume, rampDuration: 0.9)
             timer.start(duration: duration, fadeDuration: settings.timer.fadeDuration)
             isPlaying = true
+            if let sessionMode {
+                switch sessionMode {
+                case .playingPreset:
+                    if let activeQuickPreset {
+                        activeSessionMode = activeQuickPreset == .bedtime ? .sleepPreset : .napPreset
+                    }
+                case .autoResettling:
+                    if activeSessionMode == nil {
+                        activeSessionMode = .autoResettling
+                    }
+                default:
+                    break
+                }
+            }
             if var session = smartResettleSession, let sessionMode {
                 session.mode = sessionMode
                 smartResettleSession = session
@@ -738,6 +845,7 @@ final class HomeViewModel: ObservableObject {
             persistPlaybackSnapshotIfNeeded()
         } catch {
             isPlaying = false
+            activeSessionMode = nil
             warningBanner = "Playback failed: \(error.localizedDescription)"
             homeLogger.error("playback failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -914,10 +1022,12 @@ final class HomeViewModel: ObservableObject {
                 try await audio.play(sound: sound, volume: volume)
                 timer.start(duration: duration, fadeDuration: settings.timer.fadeDuration)
                 isPlaying = true
+                activeSessionMode = .mainProgramme
                 persistPlaybackSnapshotIfNeeded()
             } catch {
                 guard !Task.isCancelled, generation == playbackGeneration else { return }
                 isPlaying = false
+                activeSessionMode = nil
                 warningBanner = "\(failurePrefix): \(error.localizedDescription)"
             }
         }

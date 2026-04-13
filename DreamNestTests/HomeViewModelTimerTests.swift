@@ -118,6 +118,100 @@ final class HomeViewModelTimerTests: XCTestCase {
         XCTAssertEqual(audio.playCalls.last?.soundID, rain.id)
     }
 
+    func testSelectSoundWhileIdleDoesNotAutoplay() {
+        let timer = TimerSpy()
+        let audio = AudioStub()
+        let store = StoreStub()
+        let viewModel = HomeViewModel(
+            catalogService: SoundCatalogService(sounds: SoundDefinition.seededCatalog),
+            audio: audio,
+            timer: timer,
+            store: store,
+            cryService: CryStub(),
+            safetyPolicy: .init(),
+            cryResponseCoordinator: .init(),
+            playbackSessionStore: PlaybackSessionStoreStub()
+        )
+        let rain = SoundDefinition.seededCatalog.first(where: { $0.id == "rain" })!
+
+        viewModel.selectSound(rain)
+
+        XCTAssertFalse(viewModel.isPlaying)
+        XCTAssertTrue(audio.playCalls.isEmpty)
+    }
+
+    func testSelectingSameSoundWhilePlayingDoesNotRestartPlayback() async {
+        let timer = TimerSpy()
+        let audio = AudioStub()
+        let viewModel = HomeViewModel(
+            catalogService: SoundCatalogService(sounds: SoundDefinition.seededCatalog),
+            audio: audio,
+            timer: timer,
+            store: StoreStub(),
+            cryService: CryStub(),
+            safetyPolicy: .init(),
+            cryResponseCoordinator: .init(),
+            playbackSessionStore: PlaybackSessionStoreStub()
+        )
+        viewModel.isPlaying = true
+        let current = viewModel.selectedSound
+
+        viewModel.selectSound(current)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertTrue(audio.playCalls.isEmpty)
+    }
+
+    func testSwitchingSoundDuringPresetKeepsPresetSessionMode() async {
+        let timer = TimerSpy()
+        let audio = AudioStub()
+        let viewModel = HomeViewModel(
+            catalogService: SoundCatalogService(sounds: SoundDefinition.seededCatalog),
+            audio: audio,
+            timer: timer,
+            store: StoreStub(),
+            cryService: CryStub(),
+            safetyPolicy: .init(),
+            cryResponseCoordinator: .init(),
+            playbackSessionStore: PlaybackSessionStoreStub()
+        )
+        let rain = SoundDefinition.seededCatalog.first(where: { $0.id == "rain" })!
+        let fire = SoundDefinition.seededCatalog.first(where: { $0.id == "fire" })!
+
+        await viewModel.startPreset(.bedtime)
+        viewModel.selectSound(rain)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        viewModel.selectSound(fire)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(viewModel.activeSessionMode, .sleepPreset)
+        XCTAssertEqual(audio.playCalls.last?.soundID, fire.id)
+    }
+
+    func testOnlyActivePlaybackButtonStopsPlayback() async {
+        let timer = TimerSpy()
+        let audio = AudioStub()
+        let viewModel = HomeViewModel(
+            catalogService: SoundCatalogService(sounds: SoundDefinition.seededCatalog),
+            audio: audio,
+            timer: timer,
+            store: StoreStub(),
+            cryService: CryStub(),
+            safetyPolicy: .init(),
+            cryResponseCoordinator: .init(),
+            playbackSessionStore: PlaybackSessionStoreStub()
+        )
+
+        await viewModel.startPreset(.nap)
+        await viewModel.handlePresetButtonTap(.bedtime)
+        XCTAssertTrue(viewModel.isPlaying)
+
+        await viewModel.handlePresetButtonTap(.bedtime)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertFalse(viewModel.isPlaying)
+        XCTAssertEqual(audio.stopCalls, 1)
+    }
+
     private func makeViewModel(timer: TimerSpy) -> HomeViewModel {
         HomeViewModel(
             catalogService: CatalogStub(),
@@ -149,6 +243,7 @@ private final class AudioStub: AudioPlaybackControlling {
         let volume: Float
     }
     private(set) var playCalls: [PlayCall] = []
+    private(set) var stopCalls = 0
 
     func configureSession(micModeEnabled: Bool) throws {}
     func play(sound: SoundDefinition, volume: Float) async throws {
@@ -157,7 +252,7 @@ private final class AudioStub: AudioPlaybackControlling {
     func pause() {}
     func resume() {}
     func updateVolume(_ volume: Float, rampDuration: TimeInterval) {}
-    func stop(fadeDuration: TimeInterval) async {}
+    func stop(fadeDuration: TimeInterval) async { stopCalls += 1 }
 }
 
 private final class TimerSpy: SleepTimerScheduling {

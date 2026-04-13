@@ -73,7 +73,7 @@ struct PresetCard: View {
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onLongPress() })
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title), \(soundTitle), \(metadata)\(isActive ? ", active" : "")")
-        .accessibilityHint("Double tap to start this preset. Long press to edit.")
+        .accessibilityHint(isActive ? "Double tap to stop playback. Long press to edit." : "Double tap to start this preset. Long press to edit.")
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: state)
     }
 }

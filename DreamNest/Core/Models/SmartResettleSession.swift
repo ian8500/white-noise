@@ -29,7 +29,7 @@ public enum SmartResettleMode: Equatable, Sendable {
 
 public struct SmartResettleSession: Equatable, Sendable {
     public let preset: PlaybackPreset
-    public let sound: SoundDefinition
+    public var sound: SoundDefinition
     public let presetDuration: TimeInterval
     public let sessionStartTime: Date
     public let scheduledTimerEnd: Date

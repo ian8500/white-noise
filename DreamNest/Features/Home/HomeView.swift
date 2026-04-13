@@ -23,7 +23,7 @@ struct HomeView: View {
                 VStack(spacing: HomeLayout.sectionSpacing) {
                     header
                         .padding(.bottom, HomeLayout.headerBottomSpacing)
-                    SleepButton(isActive: viewModel.isPlaying, size: 210, action: toggleSleep)
+                    SleepButton(title: viewModel.mainButtonTitle, isActive: viewModel.mainButtonIsActive, size: 210, action: viewModel.handleMainSleepButtonTap)
                         .padding(.bottom, HomeLayout.heroBottomSpacing)
                     statusStrip
                     timerPanel
@@ -105,13 +105,13 @@ struct HomeView: View {
                 let config = viewModel.quickPresetConfiguration(for: preset)
                 let sound = viewModel.quickPresetSound(for: preset)
                 PresetCard(
-                    title: preset.title,
+                    title: viewModel.presetButtonTitle(for: preset),
                     icon: presetIcon(for: preset),
                     soundTitle: sound.title,
                     metadata: "\(Int(config.duration / 60)) min • Smart \(config.smartResettleEnabled ? "On" : "Off")",
                     state: cardState(for: preset)
                 ) {
-                    Task { await viewModel.startPreset(preset) }
+                    Task { await viewModel.handlePresetButtonTap(preset) }
                 } onLongPress: {
                     editingPreset = preset
                 }
@@ -121,9 +121,7 @@ struct HomeView: View {
 
     private var soundSelector: some View {
         SoundSelectionSummaryView(sound: viewModel.selectedSound, isPlaying: viewModel.isPlaying) {
-            if !viewModel.isPlaying {
-                viewModel.startDefaultRoutine()
-            }
+            isShowingSoundPicker = true
         } longPressAction: {
             isShowingSoundPicker = true
         }
@@ -231,16 +229,10 @@ struct HomeView: View {
         if viewModel.selectedSound.id == viewModel.quickPresetSound(for: preset).id {
             state.insert(.selected)
         }
-        if viewModel.activeQuickPreset == preset && viewModel.isPlaying {
+        if viewModel.isPresetActive(preset) {
             state.insert(.active)
         }
         return state
-    }
-
-    private func toggleSleep() {
-        withAnimation(.easeInOut(duration: 0.28)) {
-            viewModel.isPlaying ? viewModel.stopPlayback() : viewModel.startDefaultRoutine()
-        }
     }
 
     private func softHaptic(style: UIImpactFeedbackGenerator.FeedbackStyle) {
@@ -433,6 +425,7 @@ private struct DreamGradientBackground: View {
 }
 
 private struct SleepButton: View {
+    let title: String
     let isActive: Bool
     let size: CGFloat
     let action: () -> Void
@@ -442,7 +435,7 @@ private struct SleepButton: View {
             VStack(spacing: 10) {
                 Image(systemName: isActive ? "moon.zzz.fill" : "moon.stars.fill")
                     .font(.system(size: 26, weight: .semibold))
-                Text(isActive ? "Sleeping…" : "Start Sleep")
+                Text(title)
                     .font(.system(size: 22, weight: .semibold, design: .rounded))
             }
             .foregroundStyle(.white)
