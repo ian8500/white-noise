@@ -37,6 +37,7 @@ struct HomeView: View {
                 .safeAreaPadding(.horizontal, HomeLayout.horizontalPadding)
                 .safeAreaPadding(.top, HomeLayout.topSafeAreaPadding)
                 .safeAreaPadding(.bottom, HomeLayout.bottomSafeAreaPadding)
+                .padding(.bottom, HomeLayout.footerBottomSpacing)
             }
         }
         .onAppear {
@@ -153,8 +154,20 @@ struct HomeView: View {
     private var trustSignals: some View {
         Text("Designed for safe, restful sleep")
             .font(.footnote.weight(.medium))
-            .foregroundStyle(.white.opacity(0.7))
-            .padding(.vertical, 4)
+            .foregroundStyle(.white.opacity(0.76))
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: HomeLayout.footerMaxWidth)
+            .padding(.horizontal, HomeLayout.footerHorizontalPadding)
+            .padding(.vertical, HomeLayout.footerVerticalPadding)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial.opacity(0.22))
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private func presetEditor(for preset: PlaybackPreset) -> some View {
