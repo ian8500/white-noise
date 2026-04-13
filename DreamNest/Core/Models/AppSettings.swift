@@ -31,6 +31,17 @@ public enum CryComfortMode: String, Codable, CaseIterable, Equatable, Sendable {
         case .responsive: return 0.58
         }
     }
+
+    public var helperDescription: String {
+        switch self {
+        case .gentle:
+            return "Waits a little longer before replaying sound, for a softer, less reactive approach."
+        case .balanced:
+            return "A measured middle ground that gives your little one a moment, then helps them settle again."
+        case .responsive:
+            return "Reacts sooner to crying and restarts comfort more quickly for extra reassurance."
+        }
+    }
 }
 
 public struct CryResponseSettings: Codable, Equatable, Sendable {

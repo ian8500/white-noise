@@ -21,7 +21,7 @@ struct SmartResettleCard: View {
                 .allowsHitTesting(isEnabled)
                 .accessibilityElement(children: .contain)
 
-            privacyNote
+            comfortStyleDescription
         }
         .padding(16)
         .background(cardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -95,20 +95,21 @@ struct SmartResettleCard: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private var privacyNote: some View {
+    private var comfortStyleDescription: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "lock.shield")
+            Image(systemName: "heart.text.square")
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.65))
+                .foregroundStyle(.white.opacity(isEnabled ? 0.65 : 0.45))
                 .padding(.top, 1)
 
-            Text("Privacy-safe by design: cry checks happen on your device, and history stays on this phone.")
+            Text(mode.helperDescription)
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.62))
+                .foregroundStyle(.white.opacity(isEnabled ? 0.68 : 0.5))
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .opacity(isEnabled ? 1 : 0.86)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Privacy-safe by design. Cry checks happen on your device, and history stays on this phone.")
+        .accessibilityLabel("Comfort style description. \(mode.helperDescription)")
     }
 
     private var cardBackground: some ShapeStyle {
