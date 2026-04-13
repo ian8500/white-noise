@@ -72,22 +72,12 @@ struct HomeView: View {
     }
 
     private var statusStrip: some View {
-        HStack(spacing: 10) {
-            StatusPill(text: statusMessage, isTriggered: isRecentlyTriggered)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button {
-                isShowingHistory = true
-            } label: {
-                Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(12)
-                    .background(Circle().fill(Color.white.opacity(0.12)))
-            }
-            .minimumHitTarget()
-            .buttonStyle(CalmScaleButtonStyle())
-            .accessibilityLabel("Open Smart Resettle history")
+        SessionStatusCard(
+            title: primaryStatusTitle,
+            detail: secondaryStatusDetail,
+            tone: statusTone
+        ) {
+            isShowingHistory = true
         }
     }
 
@@ -207,7 +197,28 @@ struct HomeView: View {
         guard let timestamp = viewModel.lastCryDetectionTime else { return false }
         return Date().timeIntervalSince(timestamp) < 90
     }
-    private var statusMessage: String { isRecentlyTriggered ? "Cry detected" : viewModel.smartResettleStatusLabel }
+    private var primaryStatusTitle: String {
+        if isRecentlyTriggered { return "Comfort event detected" }
+        return viewModel.smartResettleStatusLabel
+    }
+
+    private var secondaryStatusDetail: String {
+        if isRecentlyTriggered { return "Smart Resettle responded. Review recent events if needed." }
+        if viewModel.isPlaying {
+            return viewModel.smartResettleSession == nil
+                ? "\(viewModel.timerDurationFriendlyLabel) remaining in this sleep session."
+                : "Monitoring for wake-ups during this sleep session."
+        }
+        return "Ready to start your next sleep routine."
+    }
+
+    private var statusTone: SessionStatusCard.Tone {
+        if isRecentlyTriggered { return .attention }
+        if viewModel.isPlaying, viewModel.smartResettleSession != nil { return .monitoring }
+        if viewModel.isPlaying { return .active }
+        return .idle
+    }
+
     private func presetIcon(for preset: PlaybackPreset) -> String {
         switch preset {
         case .bedtime: return "moon.stars.fill"
@@ -639,20 +650,90 @@ private struct SoundVisualStyle {
     }
 }
 
-private struct StatusPill: View {
-    let text: String
-    let isTriggered: Bool
+private struct SessionStatusCard: View {
+    enum Tone {
+        case idle
+        case active
+        case monitoring
+        case attention
+    }
+
+    let title: String
+    let detail: String
+    let tone: Tone
+    let onOpenRecentEvents: () -> Void
 
     var body: some View {
-        Text(text)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-            .background(Capsule().fill((isTriggered ? Color(hex: "E4A890") : Color(hex: "9BC4FF")).opacity(0.2)))
-            .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.76))
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            Button(action: onOpenRecentEvents) {
+                VStack(spacing: 4) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("Recent")
+                        .font(.caption2.weight(.semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white.opacity(0.12))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                )
+            }
+            .minimumHitTarget()
+            .buttonStyle(CalmScaleButtonStyle())
+            .accessibilityLabel("Open recent Smart Resettle events")
+            .accessibilityHint("Shows recent comfort and resettle activity")
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 13)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(backgroundColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
+    }
+
+    private var backgroundColor: Color {
+        switch tone {
+        case .idle:
+            return Color(hex: "9BC4FF").opacity(0.13)
+        case .active:
+            return Color(hex: "7E9DE8").opacity(0.16)
+        case .monitoring:
+            return Color(hex: "9FB7FF").opacity(0.2)
+        case .attention:
+            return Color(hex: "E4A890").opacity(0.2)
+        }
+    }
+
+    private var borderColor: Color {
+        switch tone {
+        case .attention:
+            return Color(hex: "F1D2BF").opacity(0.45)
+        default:
+            return Color.white.opacity(0.15)
+        }
     }
 }
 
