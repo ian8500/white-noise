@@ -210,9 +210,6 @@ struct HomeView: View {
         if viewModel.activeQuickPreset == preset && viewModel.isPlaying {
             state.insert(.active)
         }
-        if viewModel.smartResettleSession?.preset == preset || (!viewModel.isPlaying && preset == .bedtime) {
-            state.insert(.pinned)
-        }
         return state
     }
 
