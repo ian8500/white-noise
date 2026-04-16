@@ -32,6 +32,13 @@
 		A6ED11473A15DF612ECE9FBB /* ExposureGuidanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3FE03617FC4FE5E7998AFC8 /* ExposureGuidanceView.swift */; };
 		A8DA1384461E25CDD34B13C8 /* AudioPlaybackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF8D15A425DD2D29EFF98D3 /* AudioPlaybackService.swift */; };
 		AA41B00B5CFA4EAFA803BE9C /* CryResponseCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4DF1C3FD4FC1CE1847E7A1 /* CryResponseCoordinator.swift */; };
+		AA55B100A0B1C2D3E4F50001 /* AIChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA55B100A0B1C2D3E4F50000 /* AIChatMessage.swift */; };
+		AA55B101A0B1C2D3E4F50001 /* CopilotContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA55B101A0B1C2D3E4F50000 /* CopilotContext.swift */; };
+		AA55B102A0B1C2D3E4F50001 /* AIChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA55B102A0B1C2D3E4F50000 /* AIChatService.swift */; };
+		AA55B103A0B1C2D3E4F50001 /* PromptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA55B103A0B1C2D3E4F50000 /* PromptBuilder.swift */; };
+		AA55B104A0B1C2D3E4F50001 /* SafetyEscalationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA55B104A0B1C2D3E4F50000 /* SafetyEscalationService.swift */; };
+		AA55B105A0B1C2D3E4F50001 /* AIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA55B105A0B1C2D3E4F50000 /* AIChatView.swift */; };
+		AA55B106A0B1C2D3E4F50001 /* AIChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA55B106A0B1C2D3E4F50000 /* AIChatViewModel.swift */; };
 		AB12CD34EF56AB7890CD1234 /* PlaybackPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD34EF56AB7890CD1233 /* PlaybackPreset.swift */; };
 		B1A2C3D4E5F60718293A4B5C /* SmartResettleSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A2C3D4E5F60718293A4B5B /* SmartResettleSession.swift */; };
 		AFE1246FF159EC47432D90A9 /* DreamNestTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8B1933C5EDA8D71B6C7D44 /* DreamNestTheme.swift */; };
@@ -93,6 +100,13 @@
 		6F7A8B9C0D1E2F3041526373 /* PresetCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetCard.swift; sourceTree = "<group>"; };
 		9B8D7C6A5E4F3D2C1B0A9987 /* HomeViewModelTimerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModelTimerTests.swift; sourceTree = "<group>"; };
 		A32D16194C1B20B3BF134063 /* EQProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EQProfile.swift; sourceTree = "<group>"; };
+		AA55B100A0B1C2D3E4F50000 /* AIChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatMessage.swift; sourceTree = "<group>"; };
+		AA55B101A0B1C2D3E4F50000 /* CopilotContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotContext.swift; sourceTree = "<group>"; };
+		AA55B102A0B1C2D3E4F50000 /* AIChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatService.swift; sourceTree = "<group>"; };
+		AA55B103A0B1C2D3E4F50000 /* PromptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptBuilder.swift; sourceTree = "<group>"; };
+		AA55B104A0B1C2D3E4F50000 /* SafetyEscalationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafetyEscalationService.swift; sourceTree = "<group>"; };
+		AA55B105A0B1C2D3E4F50000 /* AIChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatView.swift; sourceTree = "<group>"; };
+		AA55B106A0B1C2D3E4F50000 /* AIChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatViewModel.swift; sourceTree = "<group>"; };
 		AB12CD34EF56AB7890CD1233 /* PlaybackPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackPreset.swift; sourceTree = "<group>"; };
 		B1A2C3D4E5F60718293A4B5B /* SmartResettleSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartResettleSession.swift; sourceTree = "<group>"; };
 		BE8B1933C5EDA8D71B6C7D44 /* DreamNestTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DreamNestTheme.swift; sourceTree = "<group>"; };
@@ -187,6 +201,7 @@
 		4ABCA3AA88E186E548666A06 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				AA55B107A0B1C2D3E4F50000 /* Copilot */,
 				4256C2971077C53CA53621F8 /* Exposure */,
 				2EE92564C909D1121B04AF55 /* Home */,
 			);
@@ -275,6 +290,7 @@
 			isa = PBXGroup;
 			children = (
 				2084875C361E6FC1CD50C874 /* NoiseSafetyPolicy.swift */,
+				AA55B104A0B1C2D3E4F50000 /* SafetyEscalationService.swift */,
 			);
 			path = Safety;
 			sourceTree = "<group>";
@@ -290,9 +306,20 @@
 		D8CBEB09179DED4444A5376C /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				AA55B102A0B1C2D3E4F50000 /* AIChatService.swift */,
+				AA55B103A0B1C2D3E4F50000 /* PromptBuilder.swift */,
 				CC8C760C0CEB4D6ABA7D5450 /* SoundCatalogService.swift */,
 			);
 			path = Services;
+			sourceTree = "<group>";
+		};
+		AA55B107A0B1C2D3E4F50000 /* Copilot */ = {
+			isa = PBXGroup;
+			children = (
+				AA55B105A0B1C2D3E4F50000 /* AIChatView.swift */,
+				AA55B106A0B1C2D3E4F50000 /* AIChatViewModel.swift */,
+			);
+			path = Copilot;
 			sourceTree = "<group>";
 		};
 		D9850D234A9E849DA1B12BBE /* DreamNestTests */ = {
@@ -311,6 +338,8 @@
 			isa = PBXGroup;
 			children = (
 				3085EA22953F12064B56C358 /* AppSettings.swift */,
+				AA55B100A0B1C2D3E4F50000 /* AIChatMessage.swift */,
+				AA55B101A0B1C2D3E4F50000 /* CopilotContext.swift */,
 				3BEE2E490CE3074D70D998A8 /* SoundDefinition.swift */,
 				A32D16194C1B20B3BF134063 /* EQProfile.swift */,
 				AB12CD34EF56AB7890CD1233 /* PlaybackPreset.swift */,
@@ -447,6 +476,13 @@
 				7C8D9E0F1A2B3C4D5E6F7081 /* SmartResettleCard.swift in Sources */,
 				AA41B00B5CFA4EAFA803BE9C /* CryResponseCoordinator.swift in Sources */,
 				928B4A3B45FA23D167D39B5B /* PreviewData.swift in Sources */,
+				AA55B100A0B1C2D3E4F50001 /* AIChatMessage.swift in Sources */,
+				AA55B101A0B1C2D3E4F50001 /* CopilotContext.swift in Sources */,
+				AA55B102A0B1C2D3E4F50001 /* AIChatService.swift in Sources */,
+				AA55B103A0B1C2D3E4F50001 /* PromptBuilder.swift in Sources */,
+				AA55B104A0B1C2D3E4F50001 /* SafetyEscalationService.swift in Sources */,
+				AA55B105A0B1C2D3E4F50001 /* AIChatView.swift in Sources */,
+				AA55B106A0B1C2D3E4F50001 /* AIChatViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
