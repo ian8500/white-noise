@@ -10,6 +10,7 @@ struct HomeView: View {
     @State private var isShowingSoundPicker = false
     @State private var isShowingHistory = false
     @State private var isShowingHelpNow = false
+    @State private var copilotContext: CopilotContext?
     @State private var lowStimulationMode = false
     @State private var selectedStateCard: NightState = .cantSleep
     @State private var promptIndex = 0
@@ -83,7 +84,12 @@ struct HomeView: View {
                 lowStimulationMode = true
                 viewModel.applyTimerPreset(minutes: 2)
                 viewModel.startDefaultRoutine()
+            } onAskCopilot: {
+                presentCopilot(entryPoint: .helpNow)
             }
+        }
+        .sheet(item: $copilotContext) { context in
+            AIChatView(viewModel: AIChatViewModel(context: context))
         }
     }
 
@@ -124,6 +130,19 @@ struct HomeView: View {
                     }
                 }
             }
+
+            Button {
+                presentCopilot(entryPoint: .nightState)
+            } label: {
+                Label("Ask Copilot", systemImage: "sparkles.rectangle.stack")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.1)))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.16), lineWidth: 1))
+            }
+            .buttonStyle(CalmScaleButtonStyle())
         }
     }
 
@@ -166,6 +185,19 @@ struct HomeView: View {
                 tone: statusTone,
                 onOpenRecentEvents: { isShowingHistory = true }
             )
+
+            Button {
+                presentCopilot(entryPoint: .tonightAnchor)
+            } label: {
+                Label("Ask Copilot", systemImage: "moon.stars.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.1)))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.16), lineWidth: 1))
+            }
+            .buttonStyle(CalmScaleButtonStyle())
         }
         .padding(lowStimulationMode ? 18 : 20)
         .background(
@@ -227,6 +259,19 @@ struct HomeView: View {
                     }
                     .buttonStyle(CalmScaleButtonStyle())
                 }
+
+                Button {
+                    presentCopilot(entryPoint: .resetCompletion)
+                } label: {
+                    Label("Ask Copilot after reset", systemImage: "arrow.counterclockwise.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.1)))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.16), lineWidth: 1))
+                }
+                .buttonStyle(CalmScaleButtonStyle())
             }
         }
     }
@@ -357,10 +402,20 @@ struct HomeView: View {
         UIImpactFeedbackGenerator(style: style).impactOccurred(intensity: 0.8)
 #endif
     }
+
+    private func presentCopilot(entryPoint: CopilotContext.EntryPoint) {
+        copilotContext = CopilotContext(
+            entryPoint: entryPoint,
+            nightState: selectedStateCard.style.title,
+            timerMinutes: viewModel.selectedTimerPresetMinutes ?? viewModel.timerDurationMinutes,
+            isLowStimulationMode: lowStimulationMode
+        )
+    }
 }
 
 private struct HelpNowModeView: View {
     let startGuidedReset: () -> Void
+    let onAskCopilot: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -386,6 +441,20 @@ private struct HelpNowModeView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(RoundedRectangle(cornerRadius: 18).fill(DreamNestTheme.accent))
+                }
+                .buttonStyle(CalmScaleButtonStyle())
+
+                Button {
+                    onAskCopilot()
+                    dismiss()
+                } label: {
+                    Text("Ask Copilot")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(RoundedRectangle(cornerRadius: 18).fill(Color.white.opacity(0.12)))
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.15), lineWidth: 1))
                 }
                 .buttonStyle(CalmScaleButtonStyle())
 
