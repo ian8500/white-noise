@@ -21,15 +21,12 @@ struct HomeView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: HomeLayout.sectionSpacing) {
-                    header
-                        .padding(.bottom, HomeLayout.headerBottomSpacing)
-                    SleepButton(title: viewModel.mainButtonTitle, isActive: viewModel.mainButtonIsActive, size: 210, action: viewModel.handleMainSleepButtonTap)
-                        .padding(.bottom, HomeLayout.heroBottomSpacing)
-                    statusStrip
-                    timerPanel
-                    presetSection
-                    soundSelector
-                    cryConfidencePanel
+                    heroHeader
+                    stateQuestionSection
+                    tonightAnchorSection
+                    supportivePromptSection
+                    helpNowButton
+                    supportingControls
                     trustSignals
                         .padding(.top, HomeLayout.footerTopSpacing)
                 }
@@ -57,105 +54,146 @@ struct HomeView: View {
         }
     }
 
-    private var header: some View {
-        VStack(spacing: 8) {
-            Text("DreamNest")
-                .font(.system(size: 38, weight: .bold, design: .rounded))
+    @State private var selectedStateCard: NightState = .cantSleep
+    @State private var promptIndex = 0
+    private let promptRotation = Timer.publish(every: 7, on: .main, in: .common).autoconnect()
+
+    private enum NightState: String, CaseIterable {
+        case cantSleep
+        case wiredAfterWork
+        case overwhelmed
+        case needReset
+
+        var style: NightStateCard.Style {
+            switch self {
+            case .cantSleep:
+                return .init(icon: "moon.stars", title: "Can't sleep", subtitle: "Quiet your system and settle back in.", gradient: [Color(hex: "2A3F6C"), Color(hex: "192947")])
+            case .wiredAfterWork:
+                return .init(icon: "bolt.horizontal.fill", title: "Wired after work", subtitle: "Ease out of high alert and downshift.", gradient: [Color(hex: "3D3A66"), Color(hex: "242D50")])
+            case .overwhelmed:
+                return .init(icon: "brain.head.profile", title: "Feeling overwhelmed", subtitle: "Create breathing room in a heavy moment.", gradient: [Color(hex: "3E4869"), Color(hex: "212D44")])
+            case .needReset:
+                return .init(icon: "arrow.clockwise", title: "Need to reset", subtitle: "A quick emotional and practical reset.", gradient: [Color(hex: "2F4867"), Color(hex: "1E3248")])
+            }
+        }
+    }
+
+    private let prompts = [
+        "Small step: soften your jaw, drop your shoulders, and exhale slowly.",
+        "You don't need a perfect night—just a gentler next five minutes.",
+        "Let this moment be enough. Quiet is progress.",
+        "Name one thing you can postpone until morning. Leave it there.",
+        "Try this: inhale for 4, exhale for 6, repeat three times."
+    ]
+
+    private var heroHeader: some View {
+        HomeSectionHeader(
+            eyebrow: "Night Copilot",
+            title: "Good evening.",
+            subtitle: "A calm companion for restless nights—designed for one-handed, half-awake use."
+        )
+        .padding(.bottom, HomeLayout.headerBottomSpacing)
+    }
+
+    private var stateQuestionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("What's happening right now?")
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
-                .minimumScaleFactor(0.9)
-            Text("Calm, premium sleep routines")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.white.opacity(0.72))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 6)
-    }
 
-    private var statusStrip: some View {
-        SessionStatusCard(
-            title: primaryStatusTitle,
-            detail: secondaryStatusDetail,
-            tone: statusTone
-        ) {
-            isShowingHistory = true
-        }
-    }
-
-    private var timerPanel: some View {
-        TimerControlCard(
-            timeText: viewModel.timerDurationFriendlyLabel,
-            selectedPresetMinutes: viewModel.selectedTimerPresetMinutes,
-            quickPresets: quickPresets
-        ) { delta in
-            softHaptic(style: .soft)
-            withAnimation(.spring(duration: 0.25, bounce: 0.24)) {
-                viewModel.adjustTimerDuration(minutesDelta: delta)
-            }
-        } onSelectPreset: { preset in
-            softHaptic(style: .light)
-            withAnimation(.spring(duration: 0.3, bounce: 0.2)) {
-                viewModel.applyTimerPreset(minutes: preset)
-            }
-        }
-    }
-
-    private var presetSection: some View {
-        HStack(spacing: 12) {
-            ForEach([PlaybackPreset.bedtime, .nap], id: \.self) { preset in
-                let config = viewModel.quickPresetConfiguration(for: preset)
-                let sound = viewModel.quickPresetSound(for: preset)
-                PresetCard(
-                    title: viewModel.presetButtonTitle(for: preset),
-                    icon: presetIcon(for: preset),
-                    soundTitle: sound.title,
-                    metadata: "\(Int(config.duration / 60)) min • Smart \(config.smartResettleEnabled ? "On" : "Off")",
-                    state: cardState(for: preset)
-                ) {
-                    Task { await viewModel.handlePresetButtonTap(preset) }
-                } onLongPress: {
-                    editingPreset = preset
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                ForEach(NightState.allCases, id: \.self) { state in
+                    NightStateCard(style: state.style, isActive: selectedStateCard == state) {
+                        handleStateSelection(state)
+                    }
                 }
             }
         }
     }
 
-    private var soundSelector: some View {
-        SoundSelectionSummaryView(sound: viewModel.selectedSound, isPlaying: viewModel.isPlaying) {
-            isShowingSoundPicker = true
-        } longPressAction: {
-            isShowingSoundPicker = true
+    private var tonightAnchorSection: some View {
+        SupportCard(
+            title: "Tonight's Anchor",
+            subtitle: "One reliable setup to begin winding down immediately."
+        ) {
+            VStack(spacing: 12) {
+                statusStrip
+                HStack(spacing: 10) {
+                    PrimaryActionButton(
+                        title: viewModel.mainButtonIsActive ? "Stop session" : "Start anchor",
+                        systemImage: viewModel.mainButtonIsActive ? "stop.fill" : "play.fill"
+                    ) {
+                        softHaptic(style: .soft)
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.handleMainSleepButtonTap()
+                        }
+                    }
+
+                    Button {
+                        isShowingSoundPicker = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(width: 52, height: 52)
+                            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.1)))
+                            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.14), lineWidth: 1))
+                    }
+                    .buttonStyle(CalmScaleButtonStyle())
+                    .accessibilityLabel("Adjust sound and routine")
+                }
+            }
         }
     }
 
-    private var cryConfidencePanel: some View {
-        SmartResettleCard(
-            isEnabled: Binding(get: { viewModel.cryModeEnabled }, set: { enabled in
-                if enabled { viewModel.prepareCryModeEnablement() } else { viewModel.toggleCryMode(false) }
-            }),
-            mode: Binding(get: { viewModel.cryComfortMode }, set: viewModel.setCryComfortMode),
-            onToggleChanged: { enabled in
-                if enabled { viewModel.prepareCryModeEnablement() } else { viewModel.toggleCryMode(false) }
+    private var supportivePromptSection: some View {
+        CalmPromptCard(text: prompts[promptIndex])
+            .onReceive(promptRotation) { _ in
+                withAnimation(.easeInOut(duration: 0.45)) {
+                    promptIndex = (promptIndex + 1) % prompts.count
+                }
             }
-        )
+            .transition(.opacity.combined(with: .scale(scale: 0.99)))
     }
 
-    private var trustSignals: some View {
-        Text("Designed for safe, restful sleep")
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(.white.opacity(0.76))
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: HomeLayout.footerMaxWidth)
-            .padding(.horizontal, HomeLayout.footerHorizontalPadding)
-            .padding(.vertical, HomeLayout.footerVerticalPadding)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(.ultraThinMaterial.opacity(0.22))
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
-            )
-            .frame(maxWidth: .infinity, alignment: .center)
+    private var helpNowButton: some View {
+        PrimaryActionButton(title: "Help Now", systemImage: "hand.raised.fill") {
+            softHaptic(style: .medium)
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.applyTimerPreset(minutes: 20)
+                viewModel.startDefaultRoutine()
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private var supportingControls: some View {
+        VStack(spacing: 12) {
+            timerPanel
+            soundSelector
+            cryConfidencePanel
+        }
+    }
+
+    private func handleStateSelection(_ state: NightState) {
+        selectedStateCard = state
+        softHaptic(style: .light)
+        withAnimation(.easeInOut(duration: 0.2)) {
+            switch state {
+            case .cantSleep:
+                viewModel.applyTimerPreset(minutes: 45)
+                Task { await viewModel.handlePresetButtonTap(.bedtime) }
+            case .wiredAfterWork:
+                viewModel.applyTimerPreset(minutes: 30)
+                viewModel.startDefaultRoutine()
+            case .overwhelmed:
+                viewModel.applyTimerPreset(minutes: 20)
+                viewModel.startDefaultRoutine()
+            case .needReset:
+                viewModel.applyTimerPreset(minutes: 15)
+                viewModel.startDefaultRoutine()
+            }
+        }
     }
 
     private func presetEditor(for preset: PlaybackPreset) -> some View {
