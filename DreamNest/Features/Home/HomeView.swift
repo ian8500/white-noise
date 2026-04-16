@@ -10,6 +10,8 @@ struct HomeView: View {
     @State private var isShowingSoundPicker = false
     @State private var isShowingHistory = false
     @State private var isShowingHelpNow = false
+    @State private var isShowingPremiumPreview = false
+    @State private var premiumPreviewContext: PremiumPreviewContext = .fullResetLibrary
     @State private var copilotContext: CopilotContext?
     @State private var lowStimulationMode = false
     @State private var selectedStateCard: NightState = .cantSleep
@@ -55,6 +57,7 @@ struct HomeView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: lowStimulationMode ? 14 : HomeLayout.sectionSpacing) {
                     heroHeader
+                    planOverviewSection
                     if !lowStimulationMode { stateQuestionSection }
                     tonightAnchorSection
                     helpNowButton
@@ -91,6 +94,9 @@ struct HomeView: View {
         .sheet(item: $copilotContext) { context in
             AIChatView(viewModel: AIChatViewModel(context: context))
         }
+        .sheet(isPresented: $isShowingPremiumPreview) {
+            PremiumPreviewSheet(context: premiumPreviewContext)
+        }
     }
 
     private var heroHeader: some View {
@@ -98,23 +104,60 @@ struct HomeView: View {
             HomeSectionHeader(
                 eyebrow: "Night Copilot",
                 title: "Good evening.",
-                subtitle: "A premium calm companion for tired minds and overstimulated nights."
+                subtitle: "A calm, trustworthy night companion with optional Premium depth."
             )
 
-            Toggle(isOn: $lowStimulationMode.animation(.easeInOut(duration: 0.2))) {
-                Label("Low-Stimulation Mode", systemImage: "moon.zzz.fill")
-                    .font(lowStimulationMode ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
-                    .foregroundStyle(DreamNestTheme.primaryText)
+            Button {
+                if viewModel.isFeatureAvailable(.lowStimulationMode) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        lowStimulationMode.toggle()
+                    }
+                } else {
+                    presentPremiumPreview(.lowStimulationMode)
+                }
+            } label: {
+                HStack {
+                    Label("Low-Stimulation Mode", systemImage: "moon.zzz.fill")
+                        .font(lowStimulationMode ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
+                        .foregroundStyle(DreamNestTheme.primaryText)
+                    Spacer()
+                    if viewModel.isFeatureAvailable(.lowStimulationMode) {
+                        Image(systemName: lowStimulationMode ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(.white.opacity(0.88))
+                    } else {
+                        PremiumPillLabel(title: "Premium")
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.08)))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.12), lineWidth: 1))
             }
-            .toggleStyle(.switch)
-            .tint(DreamNestTheme.accent)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.08)))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.12), lineWidth: 1))
-            .accessibilityHint("Reduces visual complexity, motion, and contrast for gentler viewing")
+            .buttonStyle(CalmScaleButtonStyle())
+            .accessibilityHint(viewModel.isFeatureAvailable(.lowStimulationMode) ? "Reduces visual complexity, motion, and contrast for gentler viewing" : "Premium feature preview")
         }
         .padding(.bottom, HomeLayout.headerBottomSpacing)
+    }
+
+    private var planOverviewSection: some View {
+        SupportCard(
+            title: "Tonight, your way",
+            subtitle: "Core calm tools stay free. Premium adds depth for tougher nights."
+        ) {
+            VStack(spacing: 10) {
+                planRow(
+                    title: "Free",
+                    description: "Night states, essential resets, limited Copilot support, and a basic Tonight’s Anchor.",
+                    icon: "moon.fill"
+                )
+                planRow(
+                    title: "Premium",
+                    description: "Full reset library, low-stimulation mode, deeper Copilot, Night Replay, personalized anchors, and calm themes.",
+                    icon: "sparkles",
+                    isPremium: true
+                )
+            }
+        }
     }
 
     private var stateQuestionSection: some View {
@@ -131,18 +174,7 @@ struct HomeView: View {
                 }
             }
 
-            Button {
-                presentCopilot(entryPoint: .nightState)
-            } label: {
-                Label("Ask Copilot", systemImage: "sparkles.rectangle.stack")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.1)))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.16), lineWidth: 1))
-            }
-            .buttonStyle(CalmScaleButtonStyle())
+            copilotButton(title: "Ask Copilot", systemImage: "sparkles.rectangle.stack", entryPoint: .nightState)
         }
     }
 
@@ -161,6 +193,13 @@ struct HomeView: View {
                     .padding(.vertical, 6)
                     .background(Capsule().fill(Color.white.opacity(0.14)))
                     .foregroundStyle(.white.opacity(0.86))
+            }
+
+            if !viewModel.isFeatureAvailable(.personalizedAnchor) {
+                lockedPremiumHint(
+                    text: "Personalize this anchor with your preferred tone and length.",
+                    context: .personalizedAnchor
+                )
             }
 
             Text(anchor.prompt)
@@ -186,18 +225,7 @@ struct HomeView: View {
                 onOpenRecentEvents: { isShowingHistory = true }
             )
 
-            Button {
-                presentCopilot(entryPoint: .tonightAnchor)
-            } label: {
-                Label("Ask Copilot", systemImage: "moon.stars.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.1)))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.16), lineWidth: 1))
-            }
-            .buttonStyle(CalmScaleButtonStyle())
+            copilotButton(title: "Ask Copilot", systemImage: "moon.stars.fill", entryPoint: .tonightAnchor)
         }
         .padding(lowStimulationMode ? 18 : 20)
         .background(
@@ -225,53 +253,23 @@ struct HomeView: View {
 
     private var quickResetLibrarySection: some View {
         let resets = QuickResetItem.seeded
+        let freeResets = Array(resets.prefix(3))
+        let premiumResets = Array(resets.dropFirst(3))
 
         return SupportCard(
             title: "Quick Reset Library",
             subtitle: "Choose a gentle intervention in one tap—designed for foggy, late-night moments."
         ) {
             VStack(spacing: 10) {
-                ForEach(resets) { reset in
-                    Button {
-                        launch(reset: reset)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: reset.icon)
-                                .font(.headline)
-                                .frame(width: 34, height: 34)
-                                .background(Circle().fill(Color.white.opacity(0.11)))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(reset.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                Text(reset.subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.7))
-                            }
-                            Spacer()
-                            Text(reset.durationLabel)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.white.opacity(0.78))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.08)))
-                    }
-                    .buttonStyle(CalmScaleButtonStyle())
+                ForEach(freeResets) { reset in
+                    resetRow(reset: reset, isLocked: false)
                 }
 
-                Button {
-                    presentCopilot(entryPoint: .resetCompletion)
-                } label: {
-                    Label("Ask Copilot after reset", systemImage: "arrow.counterclockwise.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.1)))
-                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.16), lineWidth: 1))
+                ForEach(premiumResets) { reset in
+                    resetRow(reset: reset, isLocked: !viewModel.isFeatureAvailable(.fullResetLibrary))
                 }
-                .buttonStyle(CalmScaleButtonStyle())
+
+                copilotButton(title: "Ask Copilot after reset", systemImage: "arrow.counterclockwise.circle.fill", entryPoint: .resetCompletion)
             }
         }
     }
@@ -283,19 +281,26 @@ struct HomeView: View {
             title: "Night Replay",
             subtitle: "A kind morning reflection, not a scorecard."
         ) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(replay.headline)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
+            if viewModel.isFeatureAvailable(.nightReplay) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(replay.headline)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
 
-                Text("• Tools used: \(replay.toolsUsed)")
-                    .foregroundStyle(.white.opacity(0.8))
-                Text("• Most used: \(replay.mostUsed)")
-                    .foregroundStyle(.white.opacity(0.8))
-                Text("• Settled fastest with: \(replay.fastestSettle)")
-                    .foregroundStyle(.white.opacity(0.8))
+                    Text("• Tools used: \(replay.toolsUsed)")
+                        .foregroundStyle(.white.opacity(0.8))
+                    Text("• Most used: \(replay.mostUsed)")
+                        .foregroundStyle(.white.opacity(0.8))
+                    Text("• Settled fastest with: \(replay.fastestSettle)")
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+                .font(lowStimulationMode ? .body : .footnote.weight(.medium))
+            } else {
+                lockedPremiumHint(
+                    text: "Unlock gentle morning summaries that spot patterns without pressure.",
+                    context: .nightReplay
+                )
             }
-            .font(lowStimulationMode ? .body : .footnote.weight(.medium))
         }
     }
 
@@ -344,7 +349,9 @@ struct HomeView: View {
             selectedSoundID: viewModel.selectedSound.id,
             title: "Choose Sound",
             applyButtonTitle: "Use Sound",
+            isSoundUnlocked: viewModel.isSoundUnlocked,
             onSelect: viewModel.selectSound,
+            onLockedSelect: { _ in presentPremiumPreview(.calmThemes) },
             onApply: {}
         )
         .presentationDetents([.fraction(0.72), .large])
@@ -352,6 +359,10 @@ struct HomeView: View {
 
     private func launch(reset: QuickResetItem) {
         softHaptic(style: .light)
+        guard !reset.isPremium || viewModel.isFeatureAvailable(.fullResetLibrary) else {
+            presentPremiumPreview(.fullResetLibrary)
+            return
+        }
         if let minutes = reset.durationMinutes {
             viewModel.applyTimerPreset(minutes: minutes)
             viewModel.startDefaultRoutine()
@@ -404,12 +415,140 @@ struct HomeView: View {
     }
 
     private func presentCopilot(entryPoint: CopilotContext.EntryPoint) {
+        if !canUseCopilot(for: entryPoint) {
+            presentPremiumPreview(.deepCopilot)
+            return
+        }
         copilotContext = CopilotContext(
             entryPoint: entryPoint,
             nightState: selectedStateCard.style.title,
             timerMinutes: viewModel.selectedTimerPresetMinutes ?? viewModel.timerDurationMinutes,
             isLowStimulationMode: lowStimulationMode
         )
+    }
+
+    private func canUseCopilot(for entryPoint: CopilotContext.EntryPoint) -> Bool {
+        if viewModel.isFeatureAvailable(.deepCopilot) {
+            return true
+        }
+        return entryPoint == .helpNow || entryPoint == .tonightAnchor
+    }
+
+    private func presentPremiumPreview(_ context: PremiumPreviewContext) {
+        premiumPreviewContext = context
+        isShowingPremiumPreview = true
+    }
+
+    private func planRow(title: String, description: String, icon: String, isPremium: Bool = false) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Color.white.opacity(0.11)))
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                    if isPremium {
+                        PremiumPillLabel(title: "Premium")
+                    }
+                }
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.76))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.06)))
+    }
+
+    private func resetRow(reset: QuickResetItem, isLocked: Bool) -> some View {
+        Button {
+            if isLocked {
+                presentPremiumPreview(.fullResetLibrary)
+            } else {
+                launch(reset: reset)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: reset.icon)
+                    .font(.headline)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(Color.white.opacity(0.11)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(reset.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text(isLocked ? "Included in Premium reset library." : reset.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                Spacer()
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.84))
+                } else {
+                    Text(reset.durationLabel)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.78))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.08)))
+        }
+        .buttonStyle(CalmScaleButtonStyle())
+        .opacity(isLocked ? 0.9 : 1)
+    }
+
+    private func lockedPremiumHint(text: String, context: PremiumPreviewContext) -> some View {
+        Button {
+            presentPremiumPreview(context)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.caption.weight(.semibold))
+                Text(text)
+                    .font(.footnote.weight(.medium))
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+                PremiumPillLabel(title: "Premium")
+            }
+            .foregroundStyle(.white.opacity(0.86))
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.08)))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.white.opacity(0.14), lineWidth: 1))
+        }
+        .buttonStyle(CalmScaleButtonStyle())
+    }
+
+    private func copilotButton(title: String, systemImage: String, entryPoint: CopilotContext.EntryPoint) -> some View {
+        let unlocked = canUseCopilot(for: entryPoint)
+
+        return Button {
+            presentCopilot(entryPoint: entryPoint)
+        } label: {
+            HStack {
+                Label(title, systemImage: unlocked ? systemImage : "lock.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Spacer()
+                if !unlocked {
+                    PremiumPillLabel(title: "Premium")
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 12)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.1)))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.16), lineWidth: 1))
+        }
+        .buttonStyle(CalmScaleButtonStyle())
     }
 }
 
@@ -474,15 +613,125 @@ private struct QuickResetItem: Identifiable {
     let durationMinutes: Int?
     let durationLabel: String
     let icon: String
+    let isPremium: Bool
 
     static let seeded: [QuickResetItem] = [
-        .init(title: "60-second reset", subtitle: "Tiny downshift to break stress momentum.", durationMinutes: 1, durationLabel: "1 min", icon: "bolt.slash.fill"),
-        .init(title: "2-minute settle", subtitle: "Fast settle for noisy minds.", durationMinutes: 2, durationLabel: "2 min", icon: "moon.zzz.fill"),
-        .init(title: "5-minute quiet reset", subtitle: "Let your body catch up with your intention.", durationMinutes: 5, durationLabel: "5 min", icon: "leaf.fill"),
-        .init(title: "10-minute wind-down", subtitle: "A fuller transition into sleep mode.", durationMinutes: 10, durationLabel: "10 min", icon: "bed.double.fill"),
-        .init(title: "Breathing guide", subtitle: "Longer exhale pattern for nervous-system calm.", durationMinutes: 2, durationLabel: "Breath", icon: "wind"),
-        .init(title: "Shoulder + jaw unclench", subtitle: "Release hidden tension before trying sleep again.", durationMinutes: 2, durationLabel: "Release", icon: "figure.mind.and.body")
+        .init(title: "60-second reset", subtitle: "Tiny downshift to break stress momentum.", durationMinutes: 1, durationLabel: "1 min", icon: "bolt.slash.fill", isPremium: false),
+        .init(title: "2-minute settle", subtitle: "Fast settle for noisy minds.", durationMinutes: 2, durationLabel: "2 min", icon: "moon.zzz.fill", isPremium: false),
+        .init(title: "5-minute quiet reset", subtitle: "Let your body catch up with your intention.", durationMinutes: 5, durationLabel: "5 min", icon: "leaf.fill", isPremium: false),
+        .init(title: "10-minute wind-down", subtitle: "A fuller transition into sleep mode.", durationMinutes: 10, durationLabel: "10 min", icon: "bed.double.fill", isPremium: true),
+        .init(title: "Breathing guide", subtitle: "Longer exhale pattern for nervous-system calm.", durationMinutes: 2, durationLabel: "Breath", icon: "wind", isPremium: true),
+        .init(title: "Shoulder + jaw unclench", subtitle: "Release hidden tension before trying sleep again.", durationMinutes: 2, durationLabel: "Release", icon: "figure.mind.and.body", isPremium: true)
     ]
+}
+
+private enum PremiumPreviewContext: String {
+    case fullResetLibrary
+    case lowStimulationMode
+    case deepCopilot
+    case nightReplay
+    case personalizedAnchor
+    case calmThemes
+
+    var title: String {
+        switch self {
+        case .fullResetLibrary: return "Full Reset Library"
+        case .lowStimulationMode: return "Low-Stimulation Mode"
+        case .deepCopilot: return "Deeper Copilot Support"
+        case .nightReplay: return "Night Replay"
+        case .personalizedAnchor: return "Personalized Tonight’s Anchor"
+        case .calmThemes: return "Premium Calm Themes"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .fullResetLibrary:
+            return "Add richer reset tools for high-stress nights while keeping the core free experience intact."
+        case .lowStimulationMode:
+            return "Reduce motion, contrast, and cognitive load for a gentler late-night interface."
+        case .deepCopilot:
+            return "Get longer, context-aware guidance when you want more than a quick suggestion."
+        case .nightReplay:
+            return "See compassionate summaries that reveal patterns and wins without pressure."
+        case .personalizedAnchor:
+            return "Shape your nightly anchor around your tone, pacing, and preferred routines."
+        case .calmThemes:
+            return "Unlock additional visual atmospheres designed for deep evening calm."
+        }
+    }
+}
+
+private struct PremiumPillLabel: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.9))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.white.opacity(0.16)))
+    }
+}
+
+private struct PremiumPreviewSheet: View {
+    let context: PremiumPreviewContext
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Night Copilot Premium")
+                    .font(.caption.weight(.semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(.white.opacity(0.74))
+                Text(context.title)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text(context.description)
+                    .font(.body)
+                    .foregroundStyle(.white.opacity(0.82))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Premium includes:")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.88))
+                    ForEach([
+                        "Full reset library",
+                        "Low-stimulation visual mode",
+                        "Deep Night Copilot conversations",
+                        "Night Replay summaries",
+                        "Personalized anchors and calm themes"
+                    ], id: \.self) { item in
+                        Label(item, systemImage: "checkmark")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.82))
+                    }
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.08)))
+
+                Button("Continue with Free") {
+                    dismiss()
+                }
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.12)))
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Color(hex: "101A2B").ignoresSafeArea())
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
 }
 
 private struct DreamGradientBackground: View {
