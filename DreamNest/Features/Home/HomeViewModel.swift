@@ -31,6 +31,15 @@ final class HomeViewModel: ObservableObject {
         let fastestSettle: String
     }
 
+    enum ProductFeature {
+        case fullResetLibrary
+        case lowStimulationMode
+        case deepCopilot
+        case nightReplay
+        case personalizedAnchor
+        case calmThemes
+    }
+
     private static let cryTriggeredSoundID = "white-noise"
     private static let defaultRoutineDuration: TimeInterval = 30 * 60
 
@@ -328,6 +337,21 @@ final class HomeViewModel: ObservableObject {
         )
     }
 
+    var hasPremiumAccess: Bool {
+        settings.premium.isSubscriptionActive
+    }
+
+    func isFeatureAvailable(_ feature: ProductFeature) -> Bool {
+        switch feature {
+        case .fullResetLibrary, .lowStimulationMode, .deepCopilot, .nightReplay, .personalizedAnchor, .calmThemes:
+            return hasPremiumAccess
+        }
+    }
+
+    func isSoundUnlocked(_ sound: SoundDefinition) -> Bool {
+        !sound.isPremium || hasPremiumAccess || settings.premium.unlockedSoundIDs.contains(sound.id)
+    }
+
     var defaultRoutinePreset: RoutinePreset? {
         guard let defaultRoutinePresetID else { return nil }
         return routinePresets.first(where: { $0.id == defaultRoutinePresetID })
@@ -442,6 +466,11 @@ final class HomeViewModel: ObservableObject {
     }
 
     func selectSound(_ sound: SoundDefinition) {
+        guard isSoundUnlocked(sound) else {
+            warningBanner = "\(sound.title) is part of Premium calm themes."
+            return
+        }
+
         let previousSoundID = selectedSound.id
         if previousSoundID == sound.id {
             return

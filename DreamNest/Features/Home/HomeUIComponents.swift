@@ -375,7 +375,9 @@ struct SoundPickerSheet: View {
     let selectedSoundID: String
     let title: String
     let applyButtonTitle: String
+    let isSoundUnlocked: (SoundDefinition) -> Bool
     let onSelect: (SoundDefinition) -> Void
+    let onLockedSelect: (SoundDefinition) -> Void
     let onApply: () -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -384,7 +386,17 @@ struct SoundPickerSheet: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(sounds, id: \.id) { sound in
-                        SoundTileView(sound: sound, isSelected: selectedSoundID == sound.id) { onSelect(sound) }
+                        SoundTileView(
+                            sound: sound,
+                            isSelected: selectedSoundID == sound.id,
+                            isLocked: !isSoundUnlocked(sound)
+                        ) {
+                            if isSoundUnlocked(sound) {
+                                onSelect(sound)
+                            } else {
+                                onLockedSelect(sound)
+                            }
+                        }
                     }
                 }
                 .padding()
@@ -401,23 +413,40 @@ struct SoundPickerSheet: View {
 private struct SoundTileView: View {
     let sound: SoundDefinition
     let isSelected: Bool
+    let isLocked: Bool
     let action: () -> Void
 
     var body: some View {
         let style = SoundVisualStyle.forSound(sound)
         return Button(action: action) {
             VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: style.icon).font(.title2)
+                HStack(alignment: .top) {
+                    Image(systemName: style.icon).font(.title2)
+                    Spacer()
+                    if isLocked {
+                        Image(systemName: "lock.fill")
+                            .font(.caption.weight(.semibold))
+                            .padding(6)
+                            .background(Circle().fill(Color.white.opacity(0.16)))
+                    }
+                }
                 Text(style.title).font(.headline)
-                Text(style.subtitle).font(.caption)
+                Text(isLocked ? "Premium calm theme" : style.subtitle).font(.caption)
             }
             .foregroundStyle(.white)
             .padding(12)
             .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
             .background(style.background.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(isSelected ? style.primary : .white.opacity(0.14), lineWidth: 1))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(
+                        isSelected ? style.primary : (isLocked ? Color.white.opacity(0.24) : Color.white.opacity(0.14)),
+                        lineWidth: isSelected ? 1.2 : 1
+                    )
+            )
         }
         .buttonStyle(CalmScaleButtonStyle())
+        .opacity(isLocked ? 0.88 : 1)
     }
 }
 

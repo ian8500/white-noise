@@ -99,10 +99,26 @@ public struct NoiseProtectionSettings: Codable, Equatable, Sendable {
 }
 
 public struct PremiumState: Codable, Equatable, Sendable {
+    public var isSubscriptionActive: Bool
     public var unlockedSoundIDs: Set<String>
 
-    public init(unlockedSoundIDs: Set<String> = []) {
+    public init(
+        isSubscriptionActive: Bool = false,
+        unlockedSoundIDs: Set<String> = []
+    ) {
+        self.isSubscriptionActive = isSubscriptionActive
         self.unlockedSoundIDs = unlockedSoundIDs
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case isSubscriptionActive
+        case unlockedSoundIDs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isSubscriptionActive = try container.decodeIfPresent(Bool.self, forKey: .isSubscriptionActive) ?? false
+        unlockedSoundIDs = try container.decodeIfPresent(Set<String>.self, forKey: .unlockedSoundIDs) ?? []
     }
 }
 
