@@ -7,55 +7,15 @@ import UIKit
 struct HomeView: View {
     @StateObject var viewModel: HomeViewModel
     @State private var backgroundBreathing = false
-    @State private var editingPreset: PlaybackPreset?
     @State private var isShowingSoundPicker = false
     @State private var isShowingHistory = false
+    @State private var isShowingHelpNow = false
+    @State private var lowStimulationMode = false
+    @State private var selectedStateCard: NightState = .cantSleep
+    @State private var promptIndex = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let quickPresets = [30, 45, 60, 120]
-
-    var body: some View {
-        ZStack {
-            DreamGradientBackground(isBreathing: $backgroundBreathing)
-                .ignoresSafeArea()
-
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: HomeLayout.sectionSpacing) {
-                    heroHeader
-                    stateQuestionSection
-                    tonightAnchorSection
-                    supportivePromptSection
-                    helpNowButton
-                    supportingControls
-                    trustSignals
-                        .padding(.top, HomeLayout.footerTopSpacing)
-                }
-                .frame(maxWidth: .infinity, alignment: .top)
-                .safeAreaPadding(.horizontal, HomeLayout.horizontalPadding)
-                .safeAreaPadding(.top, HomeLayout.topSafeAreaPadding)
-                .safeAreaPadding(.bottom, HomeLayout.bottomSafeAreaPadding)
-                .padding(.bottom, HomeLayout.footerBottomSpacing)
-            }
-        }
-        .onAppear {
-            let animation = Animation.easeInOut(duration: reduceMotion ? 8 : 5.6).repeatForever(autoreverses: true)
-            withAnimation(animation) { backgroundBreathing.toggle() }
-        }
-        .sheet(item: $editingPreset) { preset in presetEditor(for: preset) }
-        .sheet(isPresented: $isShowingSoundPicker) { soundPicker }
-        .sheet(isPresented: $isShowingHistory) { SmartResettleHistoryView(rows: viewModel.recentCryEvents, onClear: viewModel.clearSmartResettleHistory) }
-        .sheet(isPresented: $viewModel.showCryOnboarding) {
-            CryModeOnboardingView(
-                selectedMode: viewModel.cryComfortMode,
-                onEnable: { mode in viewModel.completeCryOnboarding(enableNow: true, mode: mode) },
-                onLater: { viewModel.completeCryOnboarding(enableNow: false, mode: viewModel.cryComfortMode) },
-                onTest: viewModel.runSmartResettleTest
-            )
-        }
-    }
-
-    @State private var selectedStateCard: NightState = .cantSleep
-    @State private var promptIndex = 0
     private let promptRotation = Timer.publish(every: 7, on: .main, in: .common).autoconnect()
 
     private enum NightState: String, CaseIterable {
@@ -73,31 +33,87 @@ struct HomeView: View {
             case .overwhelmed:
                 return .init(icon: "brain.head.profile", title: "Feeling overwhelmed", subtitle: "Create breathing room in a heavy moment.", gradient: [Color(hex: "3E4869"), Color(hex: "212D44")])
             case .needReset:
-                return .init(icon: "arrow.clockwise", title: "Need to reset", subtitle: "A quick emotional and practical reset.", gradient: [Color(hex: "2F4867"), Color(hex: "1E3248")])
+                return .init(icon: "arrow.clockwise", title: "Need a reset", subtitle: "One small reset can change the whole night.", gradient: [Color(hex: "2F4867"), Color(hex: "1E3248")])
             }
         }
     }
 
     private let prompts = [
-        "Small step: soften your jaw, drop your shoulders, and exhale slowly.",
-        "You don't need a perfect night—just a gentler next five minutes.",
-        "Let this moment be enough. Quiet is progress.",
-        "Name one thing you can postpone until morning. Leave it there.",
-        "Try this: inhale for 4, exhale for 6, repeat three times."
+        "Let tonight be simple: one slow exhale at a time.",
+        "You do not need perfect sleep—just a softer landing.",
+        "Name one worry and place it outside this room.",
+        "Your only job right now is to downshift.",
+        "The next 60 seconds can still be restorative."
     ]
 
+    var body: some View {
+        ZStack {
+            DreamGradientBackground(isBreathing: $backgroundBreathing, lowStimulationMode: lowStimulationMode)
+                .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: lowStimulationMode ? 14 : HomeLayout.sectionSpacing) {
+                    heroHeader
+                    if !lowStimulationMode { stateQuestionSection }
+                    tonightAnchorSection
+                    helpNowButton
+                    quickResetLibrarySection
+                    nightReplaySection
+                    if !lowStimulationMode { supportivePromptSection }
+                    if !lowStimulationMode { supportingControls }
+                    trustSignals
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
+                .safeAreaPadding(.horizontal, lowStimulationMode ? 24 : HomeLayout.horizontalPadding)
+                .safeAreaPadding(.top, HomeLayout.topSafeAreaPadding)
+                .safeAreaPadding(.bottom, HomeLayout.bottomSafeAreaPadding)
+                .padding(.bottom, HomeLayout.footerBottomSpacing)
+            }
+        }
+        .onAppear {
+            let animation = Animation.easeInOut(duration: (reduceMotion || lowStimulationMode) ? 8 : 5.6).repeatForever(autoreverses: true)
+            withAnimation(animation) { backgroundBreathing.toggle() }
+        }
+        .sheet(isPresented: $isShowingSoundPicker) { soundPicker }
+        .sheet(isPresented: $isShowingHistory) {
+            SmartResettleHistoryView(rows: viewModel.recentCryEvents, onClear: viewModel.clearSmartResettleHistory)
+        }
+        .sheet(isPresented: $isShowingHelpNow) {
+            HelpNowModeView {
+                lowStimulationMode = true
+                viewModel.applyTimerPreset(minutes: 2)
+                viewModel.startDefaultRoutine()
+            }
+        }
+    }
+
     private var heroHeader: some View {
-        HomeSectionHeader(
-            eyebrow: "Night Copilot",
-            title: "Good evening.",
-            subtitle: "A calm companion for restless nights—designed for one-handed, half-awake use."
-        )
+        VStack(alignment: .leading, spacing: 10) {
+            HomeSectionHeader(
+                eyebrow: "Night Copilot",
+                title: "Good evening.",
+                subtitle: "A premium calm companion for tired minds and overstimulated nights."
+            )
+
+            Toggle(isOn: $lowStimulationMode.animation(.easeInOut(duration: 0.2))) {
+                Label("Low-Stimulation Mode", systemImage: "moon.zzz.fill")
+                    .font(lowStimulationMode ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
+                    .foregroundStyle(DreamNestTheme.primaryText)
+            }
+            .toggleStyle(.switch)
+            .tint(DreamNestTheme.accent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.08)))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.12), lineWidth: 1))
+            .accessibilityHint("Reduces visual complexity, motion, and contrast for gentler viewing")
+        }
         .padding(.bottom, HomeLayout.headerBottomSpacing)
     }
 
     private var stateQuestionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("What's happening right now?")
+            Text("What kind of night is this?")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
 
@@ -112,37 +128,129 @@ struct HomeView: View {
     }
 
     private var tonightAnchorSection: some View {
-        SupportCard(
-            title: "Tonight's Anchor",
-            subtitle: "One reliable setup to begin winding down immediately."
-        ) {
-            VStack(spacing: 12) {
-                statusStrip
-                HStack(spacing: 10) {
-                    PrimaryActionButton(
-                        title: viewModel.mainButtonIsActive ? "Stop session" : "Start anchor",
-                        systemImage: viewModel.mainButtonIsActive ? "stop.fill" : "play.fill"
-                    ) {
-                        softHaptic(style: .soft)
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            viewModel.handleMainSleepButtonTap()
-                        }
-                    }
+        let anchor = viewModel.tonightAnchor
 
+        return VStack(alignment: .leading, spacing: lowStimulationMode ? 10 : 14) {
+            HStack {
+                Text("Tonight's Anchor")
+                    .font(lowStimulationMode ? .title2.weight(.semibold) : .title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Label("Signature", systemImage: "sparkles")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.white.opacity(0.14)))
+                    .foregroundStyle(.white.opacity(0.86))
+            }
+
+            Text(anchor.prompt)
+                .font(lowStimulationMode ? .title3.weight(.medium) : .title3.weight(.semibold))
+                .foregroundStyle(.white)
+
+            Text(anchor.supportingLine)
+                .font(lowStimulationMode ? .body : .subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+            PrimaryActionButton(
+                title: anchor.ctaTitle,
+                systemImage: viewModel.mainButtonIsActive ? "stop.fill" : "play.fill"
+            ) {
+                softHaptic(style: .soft)
+                anchor.action()
+            }
+
+            SessionStatusCard(
+                title: primaryStatusTitle,
+                detail: secondaryStatusDetail,
+                tone: statusTone,
+                onOpenRecentEvents: { isShowingHistory = true }
+            )
+        }
+        .padding(lowStimulationMode ? 18 : 20)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: lowStimulationMode
+                            ? [Color(hex: "253553").opacity(0.78), Color(hex: "1A243A").opacity(0.82)]
+                            : [Color(hex: "394F7C").opacity(0.72), Color(hex: "1A243A").opacity(0.82)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Color.white.opacity(0.2), lineWidth: 1.2))
+        .shadow(color: DreamNestTheme.accent.opacity(lowStimulationMode ? 0.12 : 0.25), radius: 20, y: 10)
+    }
+
+    private var helpNowButton: some View {
+        PrimaryActionButton(title: "Help Now", systemImage: "hand.raised.fill", isProminent: true) {
+            softHaptic(style: .medium)
+            isShowingHelpNow = true
+        }
+    }
+
+    private var quickResetLibrarySection: some View {
+        let resets = QuickResetItem.seeded
+
+        return SupportCard(
+            title: "Quick Reset Library",
+            subtitle: "Choose a gentle intervention in one tap—designed for foggy, late-night moments."
+        ) {
+            VStack(spacing: 10) {
+                ForEach(resets) { reset in
                     Button {
-                        isShowingSoundPicker = true
+                        launch(reset: reset)
                     } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(width: 52, height: 52)
-                            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.1)))
-                            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.14), lineWidth: 1))
+                        HStack(spacing: 12) {
+                            Image(systemName: reset.icon)
+                                .font(.headline)
+                                .frame(width: 34, height: 34)
+                                .background(Circle().fill(Color.white.opacity(0.11)))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(reset.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                Text(reset.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                            Spacer()
+                            Text(reset.durationLabel)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.78))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.08)))
                     }
                     .buttonStyle(CalmScaleButtonStyle())
-                    .accessibilityLabel("Adjust sound and routine")
                 }
             }
+        }
+    }
+
+    private var nightReplaySection: some View {
+        let replay = viewModel.nightReplay
+
+        return SupportCard(
+            title: "Night Replay",
+            subtitle: "A kind morning reflection, not a scorecard."
+        ) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(replay.headline)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+
+                Text("• Tools used: \(replay.toolsUsed)")
+                    .foregroundStyle(.white.opacity(0.8))
+                Text("• Most used: \(replay.mostUsed)")
+                    .foregroundStyle(.white.opacity(0.8))
+                Text("• Settled fastest with: \(replay.fastestSettle)")
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .font(lowStimulationMode ? .body : .footnote.weight(.medium))
         }
     }
 
@@ -156,121 +264,92 @@ struct HomeView: View {
             .transition(.opacity.combined(with: .scale(scale: 0.99)))
     }
 
-    private var helpNowButton: some View {
-        PrimaryActionButton(title: "Help Now", systemImage: "hand.raised.fill") {
-            softHaptic(style: .medium)
-            withAnimation(.easeInOut(duration: 0.2)) {
-                viewModel.applyTimerPreset(minutes: 20)
-                viewModel.startDefaultRoutine()
-            }
-        }
-        .padding(.top, 2)
-    }
-
     private var supportingControls: some View {
         VStack(spacing: 12) {
-            timerPanel
-            soundSelector
-            cryConfidencePanel
+            TimerControlCard(
+                timeText: viewModel.formattedTimerDuration,
+                selectedPresetMinutes: viewModel.selectedTimerPresetMinutes,
+                quickPresets: quickPresets,
+                onAdjust: viewModel.adjustTimerDuration,
+                onSelectPreset: viewModel.applyTimerPreset
+            )
+
+            SoundSelectionSummaryView(
+                sound: viewModel.selectedSound,
+                isPlaying: viewModel.isPlaying,
+                tapAction: { isShowingSoundPicker = true },
+                longPressAction: { isShowingSoundPicker = true }
+            )
+        }
+    }
+
+    private var trustSignals: some View {
+        Text("No accounts. No scrolling loops. No performance pressure—just support when the night feels heavy.")
+            .font(lowStimulationMode ? .body.weight(.medium) : .footnote.weight(.medium))
+            .foregroundStyle(.white.opacity(lowStimulationMode ? 0.8 : 0.68))
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, HomeLayout.footerHorizontalPadding)
+            .padding(.vertical, HomeLayout.footerVerticalPadding)
+    }
+
+    private var soundPicker: some View {
+        SoundPickerSheet(
+            sounds: viewModel.catalog,
+            selectedSoundID: viewModel.selectedSound.id,
+            title: "Choose Sound",
+            applyButtonTitle: "Use Sound",
+            onSelect: viewModel.selectSound,
+            onApply: {}
+        )
+        .presentationDetents([.fraction(0.72), .large])
+    }
+
+    private func launch(reset: QuickResetItem) {
+        softHaptic(style: .light)
+        if let minutes = reset.durationMinutes {
+            viewModel.applyTimerPreset(minutes: minutes)
+            viewModel.startDefaultRoutine()
         }
     }
 
     private func handleStateSelection(_ state: NightState) {
         selectedStateCard = state
         softHaptic(style: .light)
-        withAnimation(.easeInOut(duration: 0.2)) {
-            switch state {
-            case .cantSleep:
-                viewModel.applyTimerPreset(minutes: 45)
-                Task { await viewModel.handlePresetButtonTap(.bedtime) }
-            case .wiredAfterWork:
-                viewModel.applyTimerPreset(minutes: 30)
-                viewModel.startDefaultRoutine()
-            case .overwhelmed:
-                viewModel.applyTimerPreset(minutes: 20)
-                viewModel.startDefaultRoutine()
-            case .needReset:
-                viewModel.applyTimerPreset(minutes: 15)
-                viewModel.startDefaultRoutine()
-            }
+        switch state {
+        case .cantSleep:
+            viewModel.applyTimerPreset(minutes: 45)
+        case .wiredAfterWork:
+            viewModel.applyTimerPreset(minutes: 30)
+        case .overwhelmed:
+            viewModel.applyTimerPreset(minutes: 10)
+        case .needReset:
+            viewModel.applyTimerPreset(minutes: 5)
         }
     }
 
-    private func presetEditor(for preset: PlaybackPreset) -> some View {
-        let config = viewModel.quickPresetConfiguration(for: preset)
-        return PresetConfigurationSheet(
-            preset: preset,
-            selectedSoundID: viewModel.quickPresetSound(for: preset).id,
-            durationMinutes: Int(config.duration / 60),
-            cryDetectionEnabled: config.cryModeEnabled,
-            smartResettleEnabled: config.smartResettleEnabled,
-            listeningWindowMinutes: Int(config.listeningWindow / 60),
-            resettleDurationMinutes: Int(config.resettleDuration / 60),
-            maxAutoResettles: config.maxAutoResettles,
-            sounds: soundCatalog,
-            onSave: { soundID, minutes, cryEnabled, smartEnabled, listeningMinutes, resettleMinutes, maxCount in
-                viewModel.updateQuickPreset(
-                    preset,
-                    durationMinutes: minutes,
-                    cryModeEnabled: cryEnabled,
-                    soundID: soundID,
-                    smartResettleEnabled: smartEnabled,
-                    listeningWindowMinutes: listeningMinutes,
-                    resettleDurationMinutes: resettleMinutes,
-                    maxAutoResettles: maxCount
-                )
-            }
-        )
-    }
-
-    private var soundPicker: some View {
-        SoundPickerSheet(sounds: soundCatalog, selectedSoundID: viewModel.selectedSound.id, title: "Choose Sound", applyButtonTitle: "Use Sound", onSelect: viewModel.selectSound, onApply: {})
-            .presentationDetents([.fraction(0.72), .large])
-    }
-
-    private var soundCatalog: [SoundDefinition] { viewModel.catalog }
     private var isRecentlyTriggered: Bool {
         guard let timestamp = viewModel.lastCryDetectionTime else { return false }
         return Date().timeIntervalSince(timestamp) < 90
     }
+
     private var primaryStatusTitle: String {
         if isRecentlyTriggered { return "Comfort event detected" }
         return viewModel.smartResettleStatusLabel
     }
 
     private var secondaryStatusDetail: String {
-        if isRecentlyTriggered { return "Smart Resettle responded. Review recent events if needed." }
+        if isRecentlyTriggered { return "Smart Resettle stepped in. You can review details any time." }
         if viewModel.isPlaying {
-            return viewModel.smartResettleSession == nil
-                ? "\(viewModel.timerDurationFriendlyLabel) remaining in this sleep session."
-                : "Monitoring for wake-ups during this sleep session."
+            return "\(viewModel.timerDurationFriendlyLabel) remaining in this session."
         }
-        return "Ready to start your next sleep routine."
+        return "Ready whenever you are."
     }
 
     private var statusTone: SessionStatusCard.Tone {
         if isRecentlyTriggered { return .attention }
-        if viewModel.isPlaying, viewModel.smartResettleSession != nil { return .monitoring }
         if viewModel.isPlaying { return .active }
         return .idle
-    }
-
-    private func presetIcon(for preset: PlaybackPreset) -> String {
-        switch preset {
-        case .bedtime: return "moon.stars.fill"
-        case .nap: return "sun.max.fill"
-        }
-    }
-
-    private func cardState(for preset: PlaybackPreset) -> PresetCard.State {
-        var state: PresetCard.State = []
-        if viewModel.selectedSound.id == viewModel.quickPresetSound(for: preset).id {
-            state.insert(.selected)
-        }
-        if viewModel.isPresetActive(preset) {
-            state.insert(.active)
-        }
-        return state
     }
 
     private func softHaptic(style: UIImpactFeedbackGenerator.FeedbackStyle) {
@@ -280,113 +359,85 @@ struct HomeView: View {
     }
 }
 
-private struct TimerControlCard: View {
-    let timeText: String
-    let selectedPresetMinutes: Int?
-    let quickPresets: [Int]
-    let onAdjust: (Int) -> Void
-    let onSelectPreset: (Int) -> Void
-    private let adjustments = [-10, -5, -1, 1, 5, 10]
-    private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+private struct HelpNowModeView: View {
+    let startGuidedReset: () -> Void
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 14) {
-            adjustmentSection
-            timerDisplay
-            presetSection
-        }
-        .padding(16)
-        .background(.ultraThinMaterial.opacity(0.25), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
+        ZStack {
+            Color(hex: "101A2B").ignoresSafeArea()
 
-    private var adjustmentSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Adjustments")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.68))
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(adjustments, id: \.self) { delta in
-                    TimerPillButton(title: delta > 0 ? "+\(delta)" : "\(delta)") {
-                        onAdjust(delta)
-                    }
-                    .accessibilityLabel(delta > 0 ? "Increase timer by \(delta) minutes" : "Decrease timer by \(abs(delta)) minutes")
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Help Now")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Text("You're safe. We'll keep this simple: one breath, one shoulder drop, one minute of quiet.")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.86))
+
+                Button {
+                    startGuidedReset()
+                    dismiss()
+                } label: {
+                    Text("Begin 60-second reset")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(RoundedRectangle(cornerRadius: 18).fill(DreamNestTheme.accent))
                 }
+                .buttonStyle(CalmScaleButtonStyle())
+
+                Text("No decisions required after this.")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.64))
             }
-        }
-    }
-
-    private var timerDisplay: some View {
-        VStack(spacing: 6) {
-            Text("Sleep Timer")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.68))
-            Text(timeText)
-                .font(.system(size: 40, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .contentTransition(.numericText())
-                .animation(.spring(duration: 0.25, bounce: 0.18), value: timeText)
-                .accessibilityLabel("Timer duration")
-                .accessibilityValue(timeText)
-        }
-        .padding(.vertical, 8)
-    }
-
-    private var presetSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Presets")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.68))
-            HStack(spacing: 10) {
-                ForEach(quickPresets, id: \.self) { preset in
-                    TimerPillButton(
-                        title: presetTitle(for: preset),
-                        isSelected: selectedPresetMinutes == preset
-                    ) {
-                        onSelectPreset(preset)
-                    }
-                    .accessibilityLabel("Set timer to \(presetTitle(for: preset))")
-                    .accessibilityValue(selectedPresetMinutes == preset ? "Selected" : "Not selected")
-                }
-            }
-        }
-    }
-
-    private func presetTitle(for minutes: Int) -> String {
-        switch minutes {
-        case 60: return "1h"
-        case 120: return "2h"
-        default: return "\(minutes)m"
+            .padding(24)
         }
     }
 }
 
-private struct TimerPillButton: View {
+private struct QuickResetItem: Identifiable {
+    let id = UUID()
     let title: String
-    var isSelected = false
-    let action: () -> Void
+    let subtitle: String
+    let durationMinutes: Int?
+    let durationLabel: String
+    let icon: String
+
+    static let seeded: [QuickResetItem] = [
+        .init(title: "60-second reset", subtitle: "Tiny downshift to break stress momentum.", durationMinutes: 1, durationLabel: "1 min", icon: "bolt.slash.fill"),
+        .init(title: "2-minute settle", subtitle: "Fast settle for noisy minds.", durationMinutes: 2, durationLabel: "2 min", icon: "moon.zzz.fill"),
+        .init(title: "5-minute quiet reset", subtitle: "Let your body catch up with your intention.", durationMinutes: 5, durationLabel: "5 min", icon: "leaf.fill"),
+        .init(title: "10-minute wind-down", subtitle: "A fuller transition into sleep mode.", durationMinutes: 10, durationLabel: "10 min", icon: "bed.double.fill"),
+        .init(title: "Breathing guide", subtitle: "Longer exhale pattern for nervous-system calm.", durationMinutes: 2, durationLabel: "Breath", icon: "wind"),
+        .init(title: "Shoulder + jaw unclench", subtitle: "Release hidden tension before trying sleep again.", durationMinutes: 2, durationLabel: "Release", icon: "figure.mind.and.body")
+    ]
+}
+
+private struct DreamGradientBackground: View {
+    @Binding var isBreathing: Bool
+    let lowStimulationMode: Bool
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .lineLimit(1)
-                .minimumScaleFactor(0.92)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .foregroundStyle(.white)
-                .background(
-                    Capsule()
-                        .fill(isSelected ? Color.white.opacity(0.28) : Color.white.opacity(0.12))
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(isSelected ? Color.white.opacity(0.85) : Color.white.opacity(0.2), lineWidth: 1)
-                )
+        ZStack {
+            LinearGradient(
+                colors: lowStimulationMode
+                    ? [Color(hex: "0A1322"), Color(hex: "151D2D"), Color(hex: "1C2636")]
+                    : [Color(hex: "0B1C2C"), Color(hex: "2A3258"), Color(hex: "5E5563")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            RadialGradient(
+                colors: [Color(hex: "E4A890").opacity(lowStimulationMode ? 0.12 : (isBreathing ? 0.28 : 0.18)), .clear],
+                center: .center,
+                startRadius: 20,
+                endRadius: lowStimulationMode ? 240 : (isBreathing ? 350 : 280)
+            )
+            .blur(radius: lowStimulationMode ? 46 : 32)
         }
-        .buttonStyle(.plain)
-        .frame(minHeight: 44)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
@@ -412,373 +463,6 @@ private struct SmartResettleHistoryView: View {
                 ToolbarItem(placement: .topBarTrailing) { Button("Clear All", role: .destructive, action: onClear) }
             }
         }
-    }
-}
-
-private struct CryModeOnboardingView: View {
-    @State var selectedMode: CryComfortMode
-    let onEnable: (CryComfortMode) -> Void
-    let onLater: () -> Void
-    let onTest: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Smart Resettle uses your microphone only to detect cry patterns on-device.")
-                Picker("Response Style", selection: $selectedMode) {
-                    ForEach(CryComfortMode.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                Button("Test Smart Resettle", action: onTest)
-                Button("Enable Cry Features") { onEnable(selectedMode) }
-                    .buttonStyle(.borderedProminent)
-                Button("Maybe Later", action: onLater)
-            }
-            .padding(20)
-            .navigationTitle("Before You Enable")
-        }
-    }
-}
-
-private struct DreamGradientBackground: View {
-    @Binding var isBreathing: Bool
-
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(hex: "0B1C2C"), Color(hex: "2A3258"), Color(hex: "5E5563")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            RadialGradient(
-                colors: [Color(hex: "E4A890").opacity(isBreathing ? 0.28 : 0.18), .clear],
-                center: .center,
-                startRadius: 20,
-                endRadius: isBreathing ? 350 : 280
-            )
-            .blur(radius: 32)
-        }
-    }
-}
-
-private struct SleepButton: View {
-    let title: String
-    let isActive: Bool
-    let size: CGFloat
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 10) {
-                Image(systemName: isActive ? "moon.zzz.fill" : "moon.stars.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-            }
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(
-                Circle()
-                    .fill(LinearGradient(colors: [Color(hex: "2C426A"), Color(hex: "18243F")], startPoint: .topLeading, endPoint: .bottomTrailing))
-            )
-            .overlay(
-                Circle().stroke(Color.white.opacity(0.16), lineWidth: 1)
-            )
-            .shadow(color: Color(hex: "E4A890").opacity(0.24), radius: 16, y: 6)
-        }
-        .buttonStyle(CalmScaleButtonStyle())
-        .minimumHitTarget()
-        .accessibilityHint(isActive ? "Stops current routine" : "Starts default sleep routine")
-    }
-}
-
-private struct QuickPresetButton: View {
-    let title: String
-    let isActive: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: HomeLayout.minimumTapTarget)
-                .background(
-                    Capsule().fill(Color.white.opacity(isActive ? 0.22 : 0.1))
-                )
-                .overlay(
-                    Capsule().stroke(Color.white.opacity(isActive ? 0.26 : 0.1), lineWidth: 1)
-                )
-        }
-        .buttonStyle(CalmScaleButtonStyle())
-        .minimumHitTarget()
-    }
-}
-
-private struct SoundSelectionSummaryView: View {
-    let sound: SoundDefinition
-    let isPlaying: Bool
-    let tapAction: () -> Void
-    let longPressAction: () -> Void
-
-    var body: some View {
-        SoundPressableTile(tapAction: tapAction, longPressAction: longPressAction) {
-            HStack(spacing: 12) {
-                let style = SoundVisualStyle.forSound(sound)
-                Image(systemName: style.icon)
-                    .font(.system(size: 18, weight: .semibold))
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(style.primary.opacity(0.24)))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(style.title).font(.headline)
-                    Text(style.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.72))
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .homeCard(opacity: 0.24)
-        }
-    }
-}
-
-private struct SoundPickerSheet: View {
-    let sounds: [SoundDefinition]
-    let selectedSoundID: String
-    let title: String
-    let applyButtonTitle: String
-    let onSelect: (SoundDefinition) -> Void
-    let onApply: () -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    ForEach(sounds, id: \.id) { sound in
-                        SoundTileView(sound: sound, isSelected: selectedSoundID == sound.id) { onSelect(sound) }
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle(title)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("Close") { dismiss() } }
-                ToolbarItem(placement: .topBarTrailing) { Button(applyButtonTitle) { onApply(); dismiss() } }
-            }
-        }
-    }
-}
-
-private struct SoundTileView: View {
-    let sound: SoundDefinition
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        let style = SoundVisualStyle.forSound(sound)
-        return Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: style.icon).font(.title2)
-                Text(style.title).font(.headline)
-                Text(style.subtitle).font(.caption)
-            }
-            .foregroundStyle(.white)
-            .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
-            .background(style.background.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(isSelected ? style.primary : .white.opacity(0.14), lineWidth: 1))
-        }
-        .buttonStyle(CalmScaleButtonStyle())
-    }
-}
-
-private struct PresetConfigurationSheet: View {
-    let preset: PlaybackPreset
-    @State var selectedSoundID: String
-    @State var durationMinutes: Int
-    @State var cryDetectionEnabled: Bool
-    @State var smartResettleEnabled: Bool
-    @State var listeningWindowMinutes: Int
-    @State var resettleDurationMinutes: Int
-    @State var maxAutoResettles: Int
-    let sounds: [SoundDefinition]
-    let onSave: (String, Int, Bool, Bool, Int, Int, Int) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Picker("Sound", selection: $selectedSoundID) {
-                    ForEach(sounds, id: \.id) { Text($0.title).tag($0.id) }
-                }
-                Stepper("Duration: \(durationMinutes) min", value: $durationMinutes, in: 1...180)
-                Toggle("Cry Detection", isOn: $cryDetectionEnabled)
-                Toggle("Smart Resettle", isOn: $smartResettleEnabled)
-                if smartResettleEnabled {
-                    Stepper("Listening Window: \(listeningWindowMinutes) min", value: $listeningWindowMinutes, in: 15...60, step: 15)
-                    Stepper("Resettle Duration: \(resettleDurationMinutes) min", value: $resettleDurationMinutes, in: 3...15)
-                    Stepper("Max Auto-Resettles: \(maxAutoResettles)", value: $maxAutoResettles, in: 1...3)
-                }
-            }
-            .navigationTitle("\(preset.title) Preset")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") {
-                        onSave(selectedSoundID, durationMinutes, cryDetectionEnabled, smartResettleEnabled, listeningWindowMinutes, resettleDurationMinutes, maxAutoResettles)
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-private struct SoundPressableTile<Content: View>: View {
-    let tapAction: () -> Void
-    let longPressAction: () -> Void
-    var longPressDuration: Double = 0.5
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        Button(action: tapAction) {
-            content()
-        }
-        .buttonStyle(CalmScaleButtonStyle())
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: longPressDuration).onEnded { _ in
-                longPressAction()
-            }
-        )
-    }
-}
-
-private struct SoundVisualStyle {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let primary: Color
-    let background: Color
-
-    static func forSound(_ sound: SoundDefinition) -> SoundVisualStyle {
-        let id = sound.id.lowercased()
-        if id.contains("rain") { return .init(icon: "cloud.rain.fill", title: "Rain", subtitle: "Soft rainfall", primary: Color(hex: "9AB4D8"), background: Color(hex: "354A62")) }
-        if id.contains("white") { return .init(icon: "waveform", title: "White Noise", subtitle: "Airy masking hush", primary: Color(hex: "D4DFEA"), background: Color(hex: "4A5363")) }
-        if id.contains("pink") { return .init(icon: "waveform.path.ecg", title: sound.title, subtitle: "Warm blanket noise", primary: Color(hex: "E0B7C0"), background: Color(hex: "5A3F53")) }
-        if id.contains("fire") { return .init(icon: "flame.fill", title: "Fire", subtitle: "Cozy ember crackle", primary: Color(hex: "E4A890"), background: Color(hex: "5B4138")) }
-        return .init(icon: "sparkles", title: sound.title, subtitle: "Calm ambience", primary: Color(hex: "B4BDD3"), background: Color(hex: "39435A"))
-    }
-}
-
-private struct SessionStatusCard: View {
-    enum Tone {
-        case idle
-        case active
-        case monitoring
-        case attention
-    }
-
-    let title: String
-    let detail: String
-    let tone: Tone
-    let onOpenRecentEvents: () -> Void
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text(detail)
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.76))
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 8)
-
-            Button(action: onOpenRecentEvents) {
-                VStack(spacing: 4) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text("Recent")
-                        .font(.caption2.weight(.semibold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.12))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
-                )
-            }
-            .minimumHitTarget()
-            .buttonStyle(CalmScaleButtonStyle())
-            .accessibilityLabel("Open recent Smart Resettle events")
-            .accessibilityHint("Shows recent comfort and resettle activity")
-        }
-        .padding(.horizontal, 15)
-        .padding(.vertical, 13)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(backgroundColor)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(borderColor, lineWidth: 1)
-        )
-    }
-
-    private var backgroundColor: Color {
-        switch tone {
-        case .idle:
-            return Color(hex: "9BC4FF").opacity(0.13)
-        case .active:
-            return Color(hex: "7E9DE8").opacity(0.16)
-        case .monitoring:
-            return Color(hex: "9FB7FF").opacity(0.2)
-        case .attention:
-            return Color(hex: "E4A890").opacity(0.2)
-        }
-    }
-
-    private var borderColor: Color {
-        switch tone {
-        case .attention:
-            return Color(hex: "F1D2BF").opacity(0.45)
-        default:
-            return Color.white.opacity(0.15)
-        }
-    }
-}
-
-private extension Color {
-    init(hex: String) {
-        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: cleaned).scanHexInt64(&int)
-        let r, g, b: UInt64
-        switch cleaned.count {
-        case 6: (r, g, b) = (int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        default: (r, g, b) = (245, 247, 250)
-        }
-        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: 1)
     }
 }
 

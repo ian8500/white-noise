@@ -16,6 +16,21 @@ final class HomeViewModel: ObservableObject {
         case autoResettling
     }
 
+
+    struct TonightAnchor {
+        let prompt: String
+        let supportingLine: String
+        let ctaTitle: String
+        let action: () -> Void
+    }
+
+    struct NightReplay {
+        let headline: String
+        let toolsUsed: String
+        let mostUsed: String
+        let fastestSettle: String
+    }
+
     private static let cryTriggeredSoundID = "white-noise"
     private static let defaultRoutineDuration: TimeInterval = 30 * 60
 
@@ -242,6 +257,76 @@ final class HomeViewModel: ObservableObject {
         store.loadCryEvents(limit: limit).map(CryEventRow.init)
     }
 
+
+
+
+    var tonightAnchor: TonightAnchor {
+        if mainButtonIsActive {
+            return TonightAnchor(
+                prompt: "Your anchor is running. Keep the room quiet and let your body coast.",
+                supportingLine: "You are already in progress—no extra steps needed.",
+                ctaTitle: "Stop session",
+                action: { [weak self] in self?.handleMainSleepButtonTap() }
+            )
+        }
+
+        if let lastEvent = recentCryEvents.first {
+            return TonightAnchor(
+                prompt: "Return to your last helpful reset.",
+                supportingLine: "\(lastEvent.actionDescription) worked recently. Repeating familiar support often settles faster.",
+                ctaTitle: "Restart gentle reset",
+                action: { [weak self] in
+                    self?.applyTimerPreset(minutes: 2)
+                    self?.startDefaultRoutine()
+                }
+            )
+        }
+
+        if timerDurationMinutes <= 2 {
+            return TonightAnchor(
+                prompt: "Start your usual 2-minute settle.",
+                supportingLine: "A brief, predictable beginning can quiet decision fatigue.",
+                ctaTitle: "Begin 2-minute settle",
+                action: { [weak self] in
+                    self?.applyTimerPreset(minutes: 2)
+                    self?.startDefaultRoutine()
+                }
+            )
+        }
+
+        return TonightAnchor(
+            prompt: "Keep it simple tonight: breathe, then rest.",
+            supportingLine: "One calm sound and one short timer is enough.",
+            ctaTitle: "Start tonight's anchor",
+            action: { [weak self] in
+                self?.applyTimerPreset(minutes: 10)
+                self?.startDefaultRoutine()
+            }
+        )
+    }
+
+    var nightReplay: NightReplay {
+        if recentCryEvents.isEmpty {
+            return NightReplay(
+                headline: "Last night was quiet and steady.",
+                toolsUsed: "Anchor routine",
+                mostUsed: "2-minute settle",
+                fastestSettle: "Breathing guide"
+            )
+        }
+
+        let actionCounts = Dictionary(grouping: recentCryEvents, by: { $0.actionDescription })
+            .mapValues(\.count)
+        let topAction = actionCounts.max(by: { $0.value < $1.value })?.key ?? "Anchor routine"
+        let tools = Set(recentCryEvents.map { $0.actionDescription }).sorted().prefix(3).joined(separator: ", ")
+
+        return NightReplay(
+            headline: "You kept showing up for yourself in small, steady ways.",
+            toolsUsed: tools,
+            mostUsed: topAction,
+            fastestSettle: timerDurationMinutes <= 2 ? "60-second reset" : "2-minute settle"
+        )
+    }
 
     var defaultRoutinePreset: RoutinePreset? {
         guard let defaultRoutinePresetID else { return nil }
