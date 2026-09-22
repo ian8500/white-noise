@@ -44,6 +44,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
     }
 
     public func play(sound: SoundDefinition, volume: Float) async throws {
+        fadeTask?.cancel()
         state.send(.preparing)
         let url = resolveBundledSoundURL(filename: sound.filename)
 
@@ -131,6 +132,7 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
     }
 
     public func stop(fadeDuration: TimeInterval) async {
+        fadeTask?.cancel()
         guard let player else { return }
         let initial = player.volume
         let steps = max(1, Int(fadeDuration / 0.05))
@@ -210,9 +212,15 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
             state.send(.interrupted)
             updateNowPlayingPlaybackState(isPlaying: false)
         case .ended:
-            player?.play()
-            if let id = nowPlayingSound?.id { state.send(.playing(soundID: id)) }
-            updateNowPlayingPlaybackState(isPlaying: true)
+            let rawOptions = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            let options = AVAudioSession.InterruptionOptions(rawValue: rawOptions)
+            guard options.contains(.shouldResume) else {
+                state.send(.interrupted)
+                updateNowPlayingPlaybackState(isPlaying: false)
+                return
+            }
+
+            resume()
         @unknown default:
             break
         }
@@ -223,7 +231,12 @@ public final class AudioPlaybackService: NSObject, AudioPlaybackControlling {
               let value = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: value)
         else { return }
-        if reason == .oldDeviceUnavailable { player?.pause() }
+        if reason == .oldDeviceUnavailable {
+            player?.pause()
+            state.send(.interrupted)
+            updateNowPlayingPlaybackState(isPlaying: false)
+            audioLogger.info("Playback paused after audio output became unavailable")
+        }
     }
 
     private func updateNowPlaying(sound: SoundDefinition, isPlaying: Bool) {
