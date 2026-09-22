@@ -225,6 +225,55 @@ final class HomeViewModelTimerTests: XCTestCase {
         XCTAssertEqual(audio.stopCalls, 1)
     }
 
+    func testSmartResettleRemainsActiveUntilResettleTimerCompletes() async {
+        let timer = TimerSpy()
+        let audio = AudioStub()
+        let store = StoreStub()
+        let cry = CryStub()
+        let now = Date(timeIntervalSince1970: 1_000)
+
+        store.settings.quickStartPresets[PlaybackPreset.nap.rawValue] = .init(
+            duration: 30 * 60,
+            cryModeEnabled: true,
+            soundID: "white-noise",
+            smartResettleEnabled: true,
+            listeningWindow: 30 * 60,
+            resettleDuration: 5 * 60,
+            maxAutoResettles: 2
+        )
+
+        let viewModel = HomeViewModel(
+            catalogService: SoundCatalogService(sounds: SoundDefinition.seededCatalog),
+            audio: audio,
+            timer: timer,
+            store: store,
+            cryService: cry,
+            safetyPolicy: .init(),
+            cryResponseCoordinator: .init(),
+            playbackSessionStore: PlaybackSessionStoreStub(),
+            dateProvider: { now }
+        )
+
+        await viewModel.startPreset(.nap)
+        timer.finish()
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(viewModel.smartResettleSession?.mode, .listeningForResettle)
+
+        cry.send(.init(detected: true, confidence: 0.92, date: now.addingTimeInterval(1)))
+        cry.send(.init(detected: true, confidence: 0.93, date: now.addingTimeInterval(1.5)))
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(viewModel.smartResettleSession?.mode, .autoResettling)
+        XCTAssertTrue(viewModel.isPlaying)
+
+        timer.finish()
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(viewModel.smartResettleSession?.mode, .listeningForResettle)
+        XCTAssertFalse(viewModel.isPlaying)
+    }
+
     private func makeViewModel(timer: TimerSpy) -> HomeViewModel {
         HomeViewModel(
             catalogService: CatalogStub(),
@@ -269,16 +318,33 @@ private final class AudioStub: AudioPlaybackControlling {
 }
 
 private final class TimerSpy: SleepTimerScheduling {
-    let statePublisher = CurrentValueSubject<SleepTimerState, Never>(.init()).eraseToAnyPublisher()
+    private let stateSubject = CurrentValueSubject<SleepTimerState, Never>(.init())
+    var statePublisher: AnyPublisher<SleepTimerState, Never> { stateSubject.eraseToAnyPublisher() }
     private(set) var extendCalls: [TimeInterval] = []
 
-    func start(duration: TimeInterval, fadeDuration: TimeInterval) {}
+    func start(duration: TimeInterval, fadeDuration: TimeInterval) {
+        stateSubject.send(
+            .init(
+                isRunning: true,
+                startedAt: Date(),
+                remaining: duration,
+                fadeDuration: fadeDuration
+            )
+        )
+    }
 
     func extend(by seconds: TimeInterval) {
         extendCalls.append(seconds)
     }
 
-    func cancel() {}
+    func finish() {
+        stateSubject.send(.init())
+    }
+
+    func cancel() {
+        stateSubject.send(.init())
+    }
+
     func restoreIfNeeded(referenceDate: Date) {}
 }
 
@@ -293,8 +359,14 @@ private final class StoreStub: SettingsStoring {
 }
 
 private final class CryStub: CryDetectionControlling {
+    private let subject = PassthroughSubject<CryDetectionSignal, Never>()
+
     var detectionPublisher: AnyPublisher<CryDetectionSignal, Never> {
-        Empty().eraseToAnyPublisher()
+        subject.eraseToAnyPublisher()
+    }
+
+    func send(_ signal: CryDetectionSignal) {
+        subject.send(signal)
     }
 
     func requestPermission() async -> Bool { true }
