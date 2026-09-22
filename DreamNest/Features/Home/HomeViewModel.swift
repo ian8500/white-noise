@@ -113,8 +113,10 @@ final class HomeViewModel: ObservableObject {
         self.dateProvider = dateProvider
 
         settings = store.load()
-        settings.timer.duration = Self.defaultRoutineDuration
-        store.save(settings)
+        if settings.timer.duration < 60 {
+            settings.timer.duration = Self.defaultRoutineDuration
+            store.save(settings)
+        }
 
         let fallbackCatalog = self.catalog.isEmpty ? SoundDefinition.seededCatalog : self.catalog
         selectedSound = catalogService.sound(id: settings.lastSoundID)
@@ -532,7 +534,12 @@ final class HomeViewModel: ObservableObject {
     }
 
     func adjustTimerDuration(minutesDelta: Int) {
-        setTimerDuration(minutes: timerDurationMinutes + minutesDelta)
+        if isPlaying, timerRemaining > 0 {
+            let currentRemainingMinutes = max(1, Int(ceil(timerRemaining / 60)))
+            setTimerDuration(minutes: currentRemainingMinutes + minutesDelta)
+        } else {
+            setTimerDuration(minutes: timerDurationMinutes + minutesDelta)
+        }
     }
 
     var formattedTimerRemaining: String {
@@ -766,7 +773,17 @@ final class HomeViewModel: ObservableObject {
 
                 self.lastCryDetectionTime = signal.date
                 self.lastCryConfidence = signal.confidence
+
+                let smartResettleOwnsResponse = self.smartResettleSession != nil
                 self.processSmartResettleSignal(signal)
+
+                // Smart Resettle owns cry handling for preset sessions. Running the
+                // legacy cry response at the same time can trigger duplicate playback,
+                // volume changes, and timer extensions from a single cry event.
+                guard !smartResettleOwnsResponse else {
+                    self.refreshCooldownState()
+                    return
+                }
 
                 guard let action = self.cryResponseCoordinator.handle(
                           signal: signal,
