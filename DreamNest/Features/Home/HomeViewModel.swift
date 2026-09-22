@@ -985,15 +985,39 @@ final class HomeViewModel: ObservableObject {
     private func handlePresetTimerCompletion() async {
         await audio.stop(fadeDuration: 1.2)
         guard var session = smartResettleSession else { return }
+
+        let completedAutoResettle = session.mode == .autoResettling
+        if completedAutoResettle {
+            appendSmartResettleEvent(
+                .autoResettleEnded,
+                preset: session.preset,
+                sound: session.sound,
+                confidence: 0,
+                duration: session.configuration.resettleDuration
+            )
+        }
+
         session.resettleEndTime = nil
-        if session.isInListeningWindow(at: dateProvider()) {
+
+        if session.isInListeningWindow(at: dateProvider()), session.hasResettleCapacity {
             session.mode = .listeningForResettle
-            smartResettleSession = session
         } else {
             session.mode = .completed
-            smartResettleSession = session
-            appendSmartResettleEvent(.listeningWindowExpired, preset: session.preset, sound: session.sound, confidence: 0, duration: nil)
+            if !completedAutoResettle || session.isInListeningWindow(at: dateProvider()) == false {
+                appendSmartResettleEvent(
+                    .listeningWindowExpired,
+                    preset: session.preset,
+                    sound: session.sound,
+                    confidence: 0,
+                    duration: nil
+                )
+            }
         }
+
+        smartResettleSession = session
+        recentCryConfidenceHits.removeAll()
+        consecutiveDetectedSignals = 0
+        lastDetectedSignalAt = nil
         updateSmartResettleStatus()
     }
 
@@ -1039,19 +1063,16 @@ final class HomeViewModel: ObservableObject {
                 micModeEnabled: true,
                 sessionMode: .autoResettling
             )
-            appendSmartResettleEvent(.autoResettleEnded, preset: session.preset, sound: session.sound, confidence: 0, duration: session.configuration.resettleDuration)
-            guard var updated = smartResettleSession else { return }
-            updated.resettleEndTime = nil
-            if updated.isInListeningWindow(at: dateProvider()), updated.hasResettleCapacity {
-                updated.mode = .listeningForResettle
-            } else {
-                updated.mode = .completed
-                appendSmartResettleEvent(.listeningWindowExpired, preset: updated.preset, sound: updated.sound, confidence: 0, duration: nil)
+
+            // startPlayback returns as soon as audio begins. Keep the session in
+            // autoResettling until the sleep timer actually completes; otherwise
+            // another cry can start a second overlapping resettle.
+            if !isPlaying, var failedSession = smartResettleSession {
+                failedSession.resettleEndTime = nil
+                failedSession.mode = .completed
+                smartResettleSession = failedSession
+                updateSmartResettleStatus()
             }
-            smartResettleSession = updated
-            recentCryConfidenceHits.removeAll()
-            consecutiveDetectedSignals = 0
-            updateSmartResettleStatus()
         }
     }
 
