@@ -3,27 +3,27 @@ import SwiftUI
 enum DreamNestTheme {
     static let background = LinearGradient(
         colors: [
-            Color(hex: "080B14"),
-            Color(hex: "111A2A"),
-            Color(hex: "171E32")
+            Color(hex: "0B1014"),
+            Color(hex: "11181D"),
+            Color(hex: "171B1D")
         ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
+        startPoint: .top,
+        endPoint: .bottom
     )
 
-    static let surface = Color(hex: "1B2438")
-    static let surfaceElevated = Color(hex: "232F46")
-    static let cardBackground = Color.white.opacity(0.07)
-    static let modalBackground = Color(hex: "141C2B")
-    static let elevatedControlBackground = Color(hex: "2A3550")
+    static let surface = Color(hex: "1C2428")
+    static let surfaceElevated = Color(hex: "263035")
+    static let cardBackground = Color(hex: "1C2428")
+    static let modalBackground = Color(hex: "11181D")
+    static let elevatedControlBackground = Color(hex: "263035")
 
-    static let primaryText = Color.white
-    static let secondaryText = Color.white.opacity(0.76)
-    static let tertiaryText = Color.white.opacity(0.56)
+    static let primaryText = Color(hex: "F5F0E8")
+    static let secondaryText = Color(hex: "C9C2B8")
+    static let tertiaryText = Color(hex: "918A82")
 
-    static let accent = Color(hex: "7185C7")
-    static let accentStrong = Color(hex: "5D73B8")
-    static let accentSoft = Color(hex: "A3B7EA")
+    static let accent = Color(hex: "C79A62")
+    static let accentStrong = Color(hex: "AD7E49")
+    static let accentSoft = Color(hex: "E6D0B2")
 }
 
 private extension Color {
