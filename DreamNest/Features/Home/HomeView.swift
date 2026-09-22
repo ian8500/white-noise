@@ -200,7 +200,7 @@ struct HomeView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                    Text(viewModel.isPlaying ? "Pause" : "Start")
+                    Text(viewModel.isPlaying ? "Stop" : "Start")
                 }
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(Color(hex: "111317"))
@@ -270,7 +270,7 @@ struct HomeView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(DreamNestTheme.primaryText)
 
-                Text(viewModel.smartResettleStatusLabel)
+                Text(smartResettleDetail)
                     .font(.footnote)
                     .foregroundStyle(DreamNestTheme.secondaryText)
             }
@@ -284,6 +284,13 @@ struct HomeView: View {
             .foregroundStyle(DreamNestTheme.accentSoft)
         }
         .padding(.top, 2)
+    }
+
+    private var smartResettleDetail: String {
+        if let _ = viewModel.smartResettleSession {
+            return viewModel.smartResettleStatusLabel
+        }
+        return viewModel.isPlaying ? "Off for this session" : "Set it for Sleep or Nap"
     }
 
     private func warningMessage(_ message: String) -> some View {
