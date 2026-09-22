@@ -32,12 +32,12 @@ final class HomeViewModelTimerTests: XCTestCase {
         XCTAssertEqual(timer.extendCalls.last, -60, accuracy: 0.001)
     }
 
-    func testViewModelInitializationResetsTimerDurationToThirtyMinutes() {
+    func testViewModelInitializationPreservesSavedTimerDuration() {
         let timer = TimerSpy()
         let store = StoreStub()
         store.settings.timer.duration = 45 * 60
 
-        _ = HomeViewModel(
+        let viewModel = HomeViewModel(
             catalogService: CatalogStub(),
             audio: AudioStub(),
             timer: timer,
@@ -48,7 +48,20 @@ final class HomeViewModelTimerTests: XCTestCase {
             playbackSessionStore: PlaybackSessionStoreStub()
         )
 
-        XCTAssertEqual(store.settings.timer.duration, 30 * 60, accuracy: 0.001)
+        XCTAssertEqual(store.settings.timer.duration, 45 * 60, accuracy: 0.001)
+        XCTAssertEqual(viewModel.configuredTimerDuration, 45 * 60, accuracy: 0.001)
+    }
+
+    func testAdjustTimerWhilePlayingChangesRemainingTimeRelatively() {
+        let timer = TimerSpy()
+        let viewModel = makeViewModel(timer: timer)
+
+        viewModel.isPlaying = true
+        viewModel.timerRemaining = 15 * 60
+
+        viewModel.adjustTimerDuration(minutesDelta: 5)
+
+        XCTAssertEqual(timer.extendCalls.last, 5 * 60, accuracy: 0.001)
     }
 
     func testRoutinePresetPersistenceRoundTrip() {
